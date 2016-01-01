@@ -16,7 +16,7 @@ PROJECT_CSRC += src/main.c src/board.c src/debug.c
 PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_commands.c
 
 # Motor control
-PROJECT_CSRC += src/motor_control.c
+PROJECT_CSRC += src/motor_control.c src/motor_orientation.c
 
 UADEFS =
 ULIBDIR =

@@ -8,6 +8,7 @@
 #include "board.h"
 #include "shell_commands.h"
 #include "motor_control.h"
+#include "motor_orientation.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -122,6 +123,8 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
     
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(1));
+    
+    chprintf(chp, "%4d %4d %4d %4d %4d\r\n", angle, get_motor_orientation(), get_motor_rpm(), get_hall_angle());
   } while (argc > 0 && b != Q_RESET && b != '\r');
   
   stop_motor_control();

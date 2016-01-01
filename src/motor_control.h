@@ -5,9 +5,6 @@
 /* Returns value 1..6 */
 int get_hall_sector();
 
-/* Returns value 0..359 */
-int get_motor_orientation();
-
 /* Set motor PWM output. Angle 0-359, duty 0..255.  */
 void set_motor_pwm(int angle, int duty);
 

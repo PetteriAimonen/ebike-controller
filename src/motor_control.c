@@ -2,23 +2,14 @@
 #include <hal.h>
 #include <stm32f4xx.h>
 #include <math.h>
+#include "debug.h"
 #include "motor_control.h"
 #include "motor_config.h"
+#include "motor_orientation.h"
 
 #define PWM_FREQ 50000
 #define PWM_MAX  840
 #define F_PI 3.1415926535f
-
-// Table index is H3 | H2 | H1, value is sector 1-6.
-// Typical rotation is:
-// Hall     Sector
-// 001=1    1
-// 011=3    2
-// 010=2    3
-// 110=6    4
-// 100=4    5
-// 101=5    6
-const int g_hall_table[8] = {-1, 1, 3, 2, 5, 6, 4, -1};
 
 const uint8_t g_sine_table[121] = {
     0,   4,   8,  13,  17,  22,  26,  31,  35,  40,  44,  48,
@@ -34,15 +25,43 @@ const uint8_t g_sine_table[121] = {
   221
 };
 
-int get_hall_sector()
-{
-  uint32_t hall_state =
-    (palReadPad(GPIOB, GPIOB_HALL_1) ? 1 : 0) |
-    (palReadPad(GPIOB, GPIOB_HALL_2) ? 2 : 0) |
-    (palReadPad(GPIOC, GPIOC_HALL_3) ? 4 : 0);
-  
-  return g_hall_table[hall_state];
-}
+const uint8_t g_trapezoid_table[360] = {
+    0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,
+   12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,
+   24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,
+   36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,
+   48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,
+   
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
+   
+   59,  58,  57,  56,  55,  54,  53,  52,  51,  50,  49,  48,
+   47,  46,  45,  44,  43,  42,  41,  40,  39,  38,  37,  36,
+   35,  34,  33,  32,  31,  30,  29,  28,  27,  26,  25,  24,
+   23,  22,  21,  20,  19,  18,  17,  16,  15,  14,  13,  12,
+   11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0,
+   
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+};
 
 void set_motor_pwm(int angle, int duty)
 {
@@ -54,9 +73,15 @@ void set_motor_pwm(int angle, int duty)
   // CCRx = PWM_MAX * (sine_table/255) * (duty/255)
   // => CCRx = sine_table * (duty * PWM_MAX * 256 / (255 * 255)) / 256;
   // This precalc avoids divisions later in the computation.
-  duty = duty * PWM_MAX * 256 / (255 * 255);
+  duty = duty * PWM_MAX * 256 / (60 * 255);
+ 
+  // Trapezoidal drive waveforms
+  TIM1->CCR1 = g_trapezoid_table[(angle + 240) % 360] * duty / 256;
+  TIM1->CCR2 = g_trapezoid_table[(angle + 120) % 360] * duty / 256;
+  TIM1->CCR3 = g_trapezoid_table[(angle +   0) % 360] * duty / 256;
   
-  // Drive waveforms based on http://www.atmel.com/Images/doc8030.pdf
+/*
+  // Sinusoidal drive waveforms based on http://www.atmel.com/Images/doc8030.pdf
   if (angle < 120)
   {
     // Phase1 = sin(angle), Phase2 = 0, Phase3 = sin(120-angle)
@@ -78,6 +103,15 @@ void set_motor_pwm(int angle, int duty)
     TIM1->CCR2 = g_sine_table[360-angle] * duty / 256;
     TIM1->CCR3 = g_sine_table[angle-240] * duty / 256;
   }
+*/
+
+}
+
+CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
+{
+  // In center-aligned PWM mode, update events occur twice every period.
+  TIM1->SR &= ~TIM_SR_UIF;
+  update_motor_orientation(PWM_FREQ * 2);
 }
 
 void start_motor_control()
@@ -96,11 +130,15 @@ void start_motor_control()
   TIM1->CCMR2 = 0x0068;
   TIM1->CCER = 0x0555;
   TIM1->CNT = 0;
-  TIM1->PSC = STM32_TIMCLK2 / (PWM_FREQ * PWM_MAX * 2) - 1;
+  TIM1->PSC = STM32_TIMCLK2 / (2 * PWM_FREQ * PWM_MAX) - 1;
   TIM1->ARR = PWM_MAX - 1;
   TIM1->BDTR = 84; // 0.5µs dead time
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
   TIM1->EGR = TIM_EGR_UG;
+
+  // Enable interrupt for updating hall sensor state
+  TIM1->DIER |= TIM_DIER_UIE;
+  nvicEnableVector(STM32_TIM1_UP_NUMBER, 5);
   
   // Start the timer
   TIM1->CR1 |= TIM_CR1_CEN;
