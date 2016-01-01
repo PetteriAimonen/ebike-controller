@@ -5,7 +5,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "board.h"
 #include "shell_commands.h"
+#include "motor_control.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -57,10 +59,80 @@ static void cmd_reboot(BaseSequentialStream *chp, int argc, char *argv[])
     NVIC_SystemReset();
 }
 
+static void cmd_hall(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  int b = 0;
+  do {
+    chprintf(chp, "HALL1: %d, HALL2: %d, HALL3: %d\r\n",
+           palReadPad(GPIOB, GPIOB_HALL_1),
+           palReadPad(GPIOB, GPIOB_HALL_2),
+           palReadPad(GPIOC, GPIOC_HALL_3));
+    
+    // End if enter is pressed
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
+  } while (argc > 0 && b != Q_RESET && b != '\r');
+}
+
+static void cmd_motor_pwm(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc < 2)
+  {
+    chprintf(chp, "Usage: motor_pwm <angle> <pwm>\r\n");
+    return;
+  }
+  
+  start_motor_control();
+  set_motor_pwm(atoi(argv[0]), atoi(argv[1]));
+  
+  int b = 0;
+  do {
+    chprintf(chp, "Hall sector: %d\r\n", get_hall_sector());
+    
+    // End if enter is pressed
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
+  } while (argc > 0 && b != Q_RESET && b != '\r');
+  
+  stop_motor_control();
+}
+
+static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc < 2)
+  {
+    chprintf(chp, "Usage: motor_rotate <rpm> <pwm>\r\n");
+    return;
+  }
+  
+  int rpm = atoi(argv[0]);
+  int pwm = atoi(argv[1]);
+  
+  start_motor_control();
+  
+  int degs_per_ms = (rpm * 360) / 60000;
+  if (degs_per_ms < 1) degs_per_ms = 1;
+  
+  int angle = 0;
+  int b = 0;
+  do {
+//     chprintf(chp, "Angle %d, hall sector: %d\r\n", angle, get_hall_sector());
+    
+    angle += degs_per_ms;
+    if (angle >= 360) angle -= 360;
+    set_motor_pwm(angle, pwm);
+    
+    // End if enter is pressed
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(1));
+  } while (argc > 0 && b != Q_RESET && b != '\r');
+  
+  stop_motor_control();
+}
 
 const ShellCommand shell_commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
   {"reboot", cmd_reboot},
+  {"hall", cmd_hall},
+  {"motor_pwm", cmd_motor_pwm},
+  {"motor_rotate", cmd_motor_rotate},
   {NULL, NULL}
 };

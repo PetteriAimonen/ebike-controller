@@ -15,6 +15,9 @@ PROJECT_CSRC += src/main.c src/board.c src/debug.c
 # Shell
 PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_commands.c
 
+# Motor control
+PROJECT_CSRC += src/motor_control.c
+
 UADEFS =
 ULIBDIR =
 
@@ -26,14 +29,14 @@ program: $(BUILDDIR)/$(PROJECT).elf
 	  -c "flash write_image erase $<" -c "verify_image $<" \
 	  -c "reset run" -c "shutdown"
 
-debug: $(BUILDDIR)/$(PROJECT).elf
-	$(GDB) -iex 'target extended | $(OOCD) -d1 $(OOCDFLAGS) -c "stm32l1.cpu configure -rtos auto;" \
+debug:
+	$(GDB) -iex 'target extended | $(OOCD) -d1 $(OOCDFLAGS) -c "stm32f4x.cpu configure -rtos auto;" \
 		-c "gdb_port pipe"' -iex 'mon halt' \
-		-ex 'set *((uint32_t*)0xe0042004) = 0x07' $<
+		-ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
 
-debugraw: $(BUILDDIR)/$(PROJECT).elf
+debugraw:
 	$(GDB) -iex 'target extended | $(OOCD) -d1 $(OOCDFLAGS) \
-		-c "gdb_port pipe"' -iex 'mon halt' -ex 'set *((uint32_t*)0xe0042004) = 0x07' $<
+		-c "gdb_port pipe"' -iex 'mon halt' -ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
 
 %.o: %.c
     # Just to make kdevelop include path discovery work.
