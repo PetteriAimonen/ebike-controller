@@ -6,6 +6,7 @@
 
 static int g_motor_angle;
 static int g_motor_rpm;
+static int g_motor_rpm_adj_P;
 static int g_motor_lockcount;
 static int g_hall_time_since_change;
 static int g_hall_prev_angle;
@@ -63,7 +64,7 @@ void update_motor_orientation(int loop_freq)
     // Lost sync with the motor rotation
     g_motor_lockcount = 0;
     g_motor_angle = hall_angle;
-    g_motor_rpm = -1;
+    g_motor_rpm = 0;
   }
   
   if (hall_angle != g_hall_prev_angle)
@@ -78,6 +79,7 @@ void update_motor_orientation(int loop_freq)
       // sectors_per_s = loop_freq / g_hall_time_since_change
       // rpm = sectors_per_s * 60 / 6
       g_motor_rpm = 10 * loop_freq / g_hall_time_since_change;
+      g_motor_rpm_adj_P = 0;
       g_motor_angle = angle_now;
     }
     else
@@ -90,7 +92,8 @@ void update_motor_orientation(int loop_freq)
       // Fine-tune the velocity estimate.
       int delta = angle_diff(angle_now, g_motor_angle);
       int rpm_delta = delta * loop_freq / (g_hall_time_since_change * 6);
-      g_motor_rpm += rpm_delta / 10;
+      g_motor_rpm_adj_P = rpm_delta;
+      g_motor_rpm += rpm_delta / 12;
     }
     
     g_hall_time_since_change = 0;
@@ -104,7 +107,7 @@ void update_motor_orientation(int loop_freq)
   // Increase g_motor_angle based on g_motor_rpm.
   // Accumulator is used to take fractional values into account properly.
   static int accumulator = 0;
-  accumulator += g_motor_rpm;
+  accumulator += g_motor_rpm + g_motor_rpm_adj_P;
   
   const int acc_per_degree = loop_freq * 60 / 360;
   int degs = accumulator / acc_per_degree;
@@ -116,14 +119,14 @@ void update_motor_orientation(int loop_freq)
 
 int get_motor_orientation()
 {
-//   if (g_motor_lockcount > LOCK_THRESHOLD)
-//   {
+  if (g_motor_lockcount > LOCK_THRESHOLD)
+  {
     return g_motor_angle;
-//   }
-//   else
-//   {
-//     return g_hall_prev_angle;
-//   }
+  }
+  else
+  {
+    return g_hall_prev_angle;
+  }
 }
 
 int get_hall_angle()

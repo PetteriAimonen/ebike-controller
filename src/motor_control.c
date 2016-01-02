@@ -6,10 +6,11 @@
 #include "motor_control.h"
 #include "motor_config.h"
 #include "motor_orientation.h"
+#include "motor_sampling.h"
 
 #define PWM_FREQ 50000
+#define PWM_MAX_DUTY 800
 #define PWM_MAX  840
-#define F_PI 3.1415926535f
 
 const uint8_t g_sine_table[121] = {
     0,   4,   8,  13,  17,  22,  26,  31,  35,  40,  44,  48,
@@ -65,22 +66,22 @@ const uint8_t g_trapezoid_table[360] = {
 
 void set_motor_pwm(int angle, int duty)
 {
+  angle -= 150;
   while (angle < 0) angle += 360;
   while (angle >= 360) angle -= 360;
   if (duty < 0) duty = 0;
   if (duty > 255) duty = 255;
   
-  // CCRx = PWM_MAX * (sine_table/255) * (duty/255)
+  // CCRx = PWM_MAX_DUTY * (sine_table/255) * (duty/255)
   // => CCRx = sine_table * (duty * PWM_MAX * 256 / (255 * 255)) / 256;
   // This precalc avoids divisions later in the computation.
-  duty = duty * PWM_MAX * 256 / (60 * 255);
+  duty = duty * PWM_MAX_DUTY * 256 / (255 * 255);
  
   // Trapezoidal drive waveforms
   TIM1->CCR1 = g_trapezoid_table[(angle + 240) % 360] * duty / 256;
   TIM1->CCR2 = g_trapezoid_table[(angle + 120) % 360] * duty / 256;
   TIM1->CCR3 = g_trapezoid_table[(angle +   0) % 360] * duty / 256;
   
-/*
   // Sinusoidal drive waveforms based on http://www.atmel.com/Images/doc8030.pdf
   if (angle < 120)
   {
@@ -103,19 +104,40 @@ void set_motor_pwm(int angle, int duty)
     TIM1->CCR2 = g_sine_table[360-angle] * duty / 256;
     TIM1->CCR3 = g_sine_table[angle-240] * duty / 256;
   }
-*/
-
 }
+
+static int g_motor_run_duty = -1;
+static int g_motor_run_advance = 0;
 
 CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
 {
   // In center-aligned PWM mode, update events occur twice every period.
   TIM1->SR &= ~TIM_SR_UIF;
-  update_motor_orientation(PWM_FREQ * 2);
+  
+  if (TIM1->CR1 & TIM_CR1_DIR)
+  {
+    update_motor_orientation(PWM_FREQ);
+    motor_sampling_store();
+    
+    if (g_motor_run_duty >= 0)
+    {
+      int angle = get_motor_orientation() + g_motor_run_advance;
+      set_motor_pwm(angle, g_motor_run_duty);
+    }
+  }
+}
+
+void motor_run(int duty, int advance)
+{
+  g_motor_run_advance = advance;
+  g_motor_run_duty = duty;
 }
 
 void start_motor_control()
 {
+  g_motor_run_duty = -1;
+  g_motor_run_advance = 0;
+  
   // Enable timer clock
   RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
   
@@ -125,18 +147,22 @@ void start_motor_control()
   
   // Timer config for center-aligned PWM
   TIM1->CR1 = TIM_CR1_CMS;
-  TIM1->CR2 = 0; // All outputs off when MOE=0
+  TIM1->CR2 = 0; // All outputs off when MOE=0.
   TIM1->CCMR1 = 0x6868;
-  TIM1->CCMR2 = 0x0068;
-  TIM1->CCER = 0x0555;
+  TIM1->CCMR2 = 0x6068;
+  TIM1->CCER = 0x1555;
   TIM1->CNT = 0;
   TIM1->PSC = STM32_TIMCLK2 / (2 * PWM_FREQ * PWM_MAX) - 1;
   TIM1->ARR = PWM_MAX - 1;
   TIM1->BDTR = 84; // 0.5µs dead time
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
   TIM1->EGR = TIM_EGR_UG;
-
-  // Enable interrupt for updating hall sensor state
+  
+  // Uses CC4 to generate a pulse during the off cycle, for current sampling.
+  // PWM_MAX_DUTY ensures there is enough off time for the sampling to occur.
+  TIM1->CCR4 = PWM_MAX - 2;
+  
+  // Enable interrupt for performing motor control
   TIM1->DIER |= TIM_DIER_UIE;
   nvicEnableVector(STM32_TIM1_UP_NUMBER, 5);
   
@@ -144,6 +170,8 @@ void start_motor_control()
   TIM1->CR1 |= TIM_CR1_CEN;
   TIM1->BDTR |= TIM_BDTR_MOE;
   palSetPad(GPIOB, GPIOB_EN_GATE);
+  
+  motor_sampling_start();
 }
 
 void stop_motor_control()

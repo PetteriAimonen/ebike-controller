@@ -9,6 +9,7 @@
 #include "shell_commands.h"
 #include "motor_control.h"
 #include "motor_orientation.h"
+#include "motor_sampling.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -117,17 +118,50 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
   do {
 //     chprintf(chp, "Angle %d, hall sector: %d\r\n", angle, get_hall_sector());
     
-    angle += degs_per_ms;
+    angle += degs_per_ms * 10;
     if (angle >= 360) angle -= 360;
     set_motor_pwm(angle, pwm);
     
     // End if enter is pressed
-    b = chnGetTimeout((BaseChannel*)chp, MS2ST(1));
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
     
-    chprintf(chp, "%4d %4d %4d %4d %4d\r\n", angle, get_motor_orientation(), get_motor_rpm(), get_hall_angle());
+    chprintf(chp, "%4d %4d %4d %4d\r\n", angle, get_motor_orientation(), get_motor_rpm(), get_hall_angle());
   } while (argc > 0 && b != Q_RESET && b != '\r');
   
   stop_motor_control();
+}
+
+static void cmd_motor_go_fast(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc < 1)
+  {
+    chprintf(chp, "Usage: motor_go_fast <pwm> <advance>\r\n");
+    return;
+  }
+  
+  int pwm = atoi(argv[0]);
+  int advance = atoi(argv[1]);
+  start_motor_control();
+  
+  motor_run(pwm, advance);
+  
+  int b = 0;
+  do {
+    // End if enter is pressed
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));    
+    
+    int phase1, phase3;
+    motor_get_currents(&phase1, &phase3);
+  
+    chprintf(chp, "%4d %4d %4d %6d %6d\r\n", get_motor_orientation(), get_motor_rpm(), get_hall_angle(), phase1, phase3);
+  } while (argc > 0 && b != Q_RESET && b != '\r');
+  
+  stop_motor_control();
+}
+
+static void cmd_motor_samples(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  motor_sampling_print(chp);
 }
 
 const ShellCommand shell_commands[] = {
@@ -137,5 +171,7 @@ const ShellCommand shell_commands[] = {
   {"hall", cmd_hall},
   {"motor_pwm", cmd_motor_pwm},
   {"motor_rotate", cmd_motor_rotate},
+  {"motor_go_fast", cmd_motor_go_fast},
+  {"motor_samples", cmd_motor_samples},
   {NULL, NULL}
 };

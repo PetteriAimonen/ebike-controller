@@ -3,6 +3,7 @@
 #include <stm32f4xx.h>
 #include <chprintf.h>
 #include "board.h"
+#include "usb_usart.h"
 
 void dbg(const char *fmt, ...)
 {
@@ -43,5 +44,5 @@ void __attribute__((naked)) HardFault_Handler()
     
     stack_pointer = HARDFAULT_PSP;
 
-    for (;;) {}
+    abort_with_error("HF %08x", *((uint32_t*)stack_pointer + 6));
 }
