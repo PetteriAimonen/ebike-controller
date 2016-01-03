@@ -2,15 +2,34 @@
 #include <hal.h>
 #include <stm32f4xx.h>
 #include <chprintf.h>
+#include <memstreams.h>
+#include <string.h>
 #include "board.h"
 #include "usb_usart.h"
+
+static char g_dbgmsg[128];
+
+void vdbg(const char *fmt, va_list ap)
+{
+  MemoryStream ms;
+  msObjectInit(&ms, (uint8_t *)g_dbgmsg, sizeof(g_dbgmsg) - 1, 0);
+  memset(g_dbgmsg, 0, sizeof(g_dbgmsg));
+  
+  chvprintf((BaseSequentialStream*)&ms, fmt, ap);
+  chvprintf((BaseSequentialStream*)&ms, "\r\n", ap);
+  
+  for (char *p = g_dbgmsg; *p; p++)
+  {
+    while ((USART6->SR & USART_SR_TXE) == 0) {}
+    USART6->DR = *p;
+  }
+}
 
 void dbg(const char *fmt, ...)
 {
   va_list ap;
   va_start(ap, fmt);
-  chvprintf((BaseSequentialStream*)&SD6, fmt, ap);
-  chprintf((BaseSequentialStream*)&SD6, "\r\n");
+  vdbg(fmt, ap);
   va_end(ap);
 }
 
@@ -20,12 +39,11 @@ void abort_with_error(const char *fmt, ...)
   TIM1->BDTR &= ~TIM_BDTR_MOE;
   TIM1->CR1 &= ~TIM_CR1_CEN;
   
-  while (1)
+  for (;;)
   {
     va_list ap;
     va_start(ap, fmt);
-    chvprintf((BaseSequentialStream*)&SD6, fmt, ap);
-    chprintf((BaseSequentialStream*)&SD6, "\r\n");
+    vdbg(fmt, ap);
     va_end(ap);
     
     chSysPolledDelayX(168000000);

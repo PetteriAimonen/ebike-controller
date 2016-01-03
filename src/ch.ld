@@ -35,7 +35,7 @@ MEMORY
 
 /* RAM region to be used for Main stack. This stack accommodates the processing
    of all exceptions and interrupts*/
-REGION_ALIAS("MAIN_STACK_RAM", ram0);
+REGION_ALIAS("MAIN_STACK_RAM", ram4);
 
 /* RAM region to be used for the process stack. This is the stack used by
    the main() function.*/

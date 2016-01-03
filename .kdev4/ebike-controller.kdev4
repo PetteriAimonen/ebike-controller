@@ -158,3 +158,6 @@ targets=2
 inclusive=0
 pattern=__pycache__
 targets=2
+
+[Project]
+VersionControlSupport=kdevgit

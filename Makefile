@@ -6,8 +6,8 @@ PROJECT = ebike-controller
 BUILDDIR = build
 UINCDIR += src
 
-USE_OPT += -O1 -g -gdwarf-2 -g3 \
-        -fno-omit-frame-pointer -fno-common -std=gnu99
+USE_OPT += -Os -g -gdwarf-2 -g3 \
+        -fomit-frame-pointer -falign-functions=16 -std=gnu99 -ffast-math
 
 # Base system & bootup
 PROJECT_CSRC += src/main.c src/board.c src/debug.c
@@ -19,7 +19,8 @@ PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_com
 PROJECT_CSRC += src/motor_control.c src/motor_orientation.c src/motor_sampling.c
 
 UADEFS =
-ULIBDIR =
+ULIBDIR = 
+ULIBS = -lm
 
 include Makefile.chibios
 

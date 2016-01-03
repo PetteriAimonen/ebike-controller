@@ -3,7 +3,7 @@
 int get_hall_sector();
 
 // Called by motor control
-void update_motor_orientation(int loop_freq);
+void update_motor_orientation();
 
 // Returns value 0..359
 int get_motor_orientation();

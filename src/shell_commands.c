@@ -116,16 +116,17 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
   int angle = 0;
   int b = 0;
   do {
-//     chprintf(chp, "Angle %d, hall sector: %d\r\n", angle, get_hall_sector());
-    
-    angle += degs_per_ms * 10;
+    angle += degs_per_ms;
     if (angle >= 360) angle -= 360;
     set_motor_pwm(angle, pwm);
     
     // End if enter is pressed
-    b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(1));
     
-    chprintf(chp, "%4d %4d %4d %4d\r\n", angle, get_motor_orientation(), get_motor_rpm(), get_hall_angle());
+    char buf[64];
+    chsnprintf(buf, sizeof(buf), "%4d %4d %4d %4d\r\n",
+               angle, get_motor_orientation(), get_motor_rpm(), get_hall_angle());
+    chSequentialStreamWrite(chp, (void*)buf, strlen(buf));
   } while (argc > 0 && b != Q_RESET && b != '\r');
   
   stop_motor_control();
@@ -150,10 +151,10 @@ static void cmd_motor_go_fast(BaseSequentialStream *chp, int argc, char *argv[])
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));    
     
-    int phase1, phase3;
-    motor_get_currents(&phase1, &phase3);
-  
-    chprintf(chp, "%4d %4d %4d %6d %6d\r\n", get_motor_orientation(), get_motor_rpm(), get_hall_angle(), phase1, phase3);
+    chprintf(chp, "%6d RPM, %6d V, %6d mA, %d ticks\r\n",
+             get_motor_rpm(), get_battery_voltage_mV(), get_battery_current_mA(),
+             motor_get_interrupt_time()
+            );
   } while (argc > 0 && b != Q_RESET && b != '\r');
   
   stop_motor_control();

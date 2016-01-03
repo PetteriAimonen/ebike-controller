@@ -3,6 +3,7 @@
 #include <stm32f4xx.h>
 #include <stdlib.h>
 #include "debug.h"
+#include "motor_config.h"
 
 static int g_motor_angle;
 static int g_motor_rpm;
@@ -42,7 +43,7 @@ static int angle_diff(int a, int b)
   return diff;
 }
 
-void update_motor_orientation(int loop_freq)
+void update_motor_orientation()
 {
   int sector = get_hall_sector();
   
@@ -58,6 +59,7 @@ void update_motor_orientation(int loop_freq)
   }
   
   int hall_angle = 360 - sector * 60 + 30;
+  hall_angle = (hall_angle + HALL_OFFSET + 360) % 360;
   
   if (abs(angle_diff(hall_angle, g_motor_angle)) > 60)
   {
@@ -76,9 +78,9 @@ void update_motor_orientation(int loop_freq)
     if (g_motor_rpm <= 0)
     {
       // Setup the velocity based on time between sectors.
-      // sectors_per_s = loop_freq / g_hall_time_since_change
+      // sectors_per_s = CONTROL_FREQ / g_hall_time_since_change
       // rpm = sectors_per_s * 60 / 6
-      g_motor_rpm = 10 * loop_freq / g_hall_time_since_change;
+      g_motor_rpm = 10 * CONTROL_FREQ / g_hall_time_since_change;
       g_motor_rpm_adj_P = 0;
       g_motor_angle = angle_now;
     }
@@ -91,7 +93,7 @@ void update_motor_orientation(int loop_freq)
       
       // Fine-tune the velocity estimate.
       int delta = angle_diff(angle_now, g_motor_angle);
-      int rpm_delta = delta * loop_freq / (g_hall_time_since_change * 6);
+      int rpm_delta = delta * CONTROL_FREQ / (g_hall_time_since_change * 6);
       g_motor_rpm_adj_P = rpm_delta;
       g_motor_rpm += rpm_delta / 12;
     }
@@ -109,7 +111,7 @@ void update_motor_orientation(int loop_freq)
   static int accumulator = 0;
   accumulator += g_motor_rpm + g_motor_rpm_adj_P;
   
-  const int acc_per_degree = loop_freq * 60 / 360;
+  const int acc_per_degree = CONTROL_FREQ * 60 / 360;
   int degs = accumulator / acc_per_degree;
   int new_angle = g_motor_angle + degs;
   if (new_angle >= 360) new_angle -= 360;

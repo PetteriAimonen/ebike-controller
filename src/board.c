@@ -15,6 +15,7 @@
 */
 
 #include "hal.h"
+#include <stm32f4xx.h>
 
 #if HAL_USE_PAL || defined(__DOXYGEN__)
 /**

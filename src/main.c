@@ -5,6 +5,38 @@
 #include "usb_usart.h"
 #include "bluetooth_usart.h"
 
+void enable_trace()
+{
+  // Enable SWO trace
+  DBGMCU->CR |= DBGMCU_CR_TRACE_IOEN; // Enable IO trace pins
+  
+  /* Configure Trace Port Interface Unit */
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // Enable access to registers
+  TPI->ACPR = 20; // Trace clock = HCLK/(x+1) = 8MHz
+  TPI->SPPR = 2; // Pin protocol = NRZ/USART
+  TPI->FFCR = 0x100; // ITM trace only
+  
+  /* Configure PC sampling and exception trace  */
+  DWT->CTRL = (1 << DWT_CTRL_CYCTAP_Pos) // Prescaler for PC sampling
+                                          // 0 = x32, 1 = x512
+            | (3 << DWT_CTRL_POSTPRESET_Pos) // Postscaler for PC sampling
+                                              // Divider = value + 1
+            | (1 << DWT_CTRL_PCSAMPLENA_Pos) // Enable PC sampling
+            | (2 << DWT_CTRL_SYNCTAP_Pos)    // Sync packet interval
+                                              // 0 = Off, 1 = Every 2^23 cycles,
+                                              // 2 = Every 2^25, 3 = Every 2^27
+            | (1 << DWT_CTRL_EXCTRCENA_Pos)  // Enable exception trace
+            | (1 << DWT_CTRL_CYCCNTENA_Pos); // Enable cycle counter
+            
+  /* Configure instrumentation trace macroblock */
+  ITM->LAR = 0xC5ACCE55;
+  ITM->TCR = (1 << ITM_TCR_TraceBusID_Pos) // Trace bus ID for TPIU
+            | (1 << ITM_TCR_DWTENA_Pos) // Enable events from DWT
+            | (1 << ITM_TCR_SYNCENA_Pos) // Enable sync packets
+            | (1 << ITM_TCR_ITMENA_Pos); // Main enable for ITM
+  ITM->TER = 0xFFFFFFFF; // Enable all stimulus ports 
+}
+
 int main(void)
 {
     halInit();
@@ -12,6 +44,8 @@ int main(void)
     shellInit();
 
     start_bluetooth_shell();
+    
+//     enable_trace();
     
     while (true)
     {

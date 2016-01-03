@@ -2,141 +2,165 @@
 #include <hal.h>
 #include <stm32f4xx.h>
 #include <math.h>
+#include <complex.h>
 #include "debug.h"
 #include "motor_control.h"
 #include "motor_config.h"
 #include "motor_orientation.h"
 #include "motor_sampling.h"
 
-#define PWM_FREQ 50000
-#define PWM_MAX_DUTY 800
-#define PWM_MAX  840
+// Some useful constants
+static const float f_pi = 3.14159265f;
+static const float f_sqrt3 = 1.7320508f;
+static const float f_invsqrt3 = 0.57735027f;
+static const float complex f_v1 = 1.0f; // 0 deg angle
+static const float complex f_v2 = -0.5f + 0.866025fi; // +120 deg angle
+static const float complex f_v3 = -0.5f - 0.866025fi; // +240 deg angle
 
-const uint8_t g_sine_table[121] = {
-    0,   4,   8,  13,  17,  22,  26,  31,  35,  40,  44,  48,
-   53,  57,  61,  66,  70,  74,  79,  83,  87,  91,  95, 100,
-  104, 108, 112, 116, 120, 124, 127, 131, 135, 139, 143, 146,
-  150, 154, 157, 161, 164, 167, 171, 174, 177, 181, 184, 187,
-  190, 193, 196, 198, 201, 204, 207, 209, 212, 214, 217, 219,
-  221, 223, 226, 228, 230, 232, 233, 235, 237, 238, 240, 242,
-  243, 244, 246, 247, 248, 249, 250, 251, 252, 252, 253, 254,
-  254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  254, 254, 253, 252, 252, 251, 250, 249, 248, 247, 246, 244,
-  243, 242, 240, 238, 237, 235, 233, 232, 230, 228, 226, 223,
-  221
-};
+// GCC's cabsf is a bit slowish for some reason..
+float cabsf(float complex x)
+{
+  float i = cimagf(x);
+  float r = crealf(x);
+  return sqrtf(i*i + r*r);
+}
 
-const uint8_t g_trapezoid_table[360] = {
-    0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,
-   12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,
-   24,  25,  26,  27,  28,  29,  30,  31,  32,  33,  34,  35,
-   36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,
-   48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,
-   
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,  60,
-   
-   59,  58,  57,  56,  55,  54,  53,  52,  51,  50,  49,  48,
-   47,  46,  45,  44,  43,  42,  41,  40,  39,  38,  37,  36,
-   35,  34,  33,  32,  31,  30,  29,  28,  27,  26,  25,  24,
-   23,  22,  21,  20,  19,  18,  17,  16,  15,  14,  13,  12,
-   11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0,
-   
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0
-};
+void set_modulation_vector(float complex v)
+{
+  // Inverse Clark transform
+  float u1 = crealf(v) * crealf(f_v1) + cimagf(v) * cimagf(f_v1);
+  float u2 = crealf(v) * crealf(f_v2) + cimagf(v) * cimagf(f_v2);
+  float u3 = crealf(v) * crealf(f_v3) + cimagf(v) * cimagf(f_v3);
+  
+  // Choose the smallest value as the PWM term that stays 0
+  float min = u1;
+  if (u2 < min) min = u2;
+  if (u3 < min) min = u3;
+  u1 -= min;
+  u2 -= min;
+  u3 -= min;
+  
+  // Convert to integers for PWM
+  // Note: CCR1 channel is connected to phase3 and CCR3 to phase1.
+  float scaler = PWM_MAX_DUTY / f_sqrt3;
+  TIM1->CCR3 = (int)roundf(u1 * scaler);
+  TIM1->CCR2 = (int)roundf(u2 * scaler);
+  TIM1->CCR1 = (int)roundf(u3 * scaler);
+}
 
 void set_motor_pwm(int angle, int duty)
 {
-  angle -= 150;
-  while (angle < 0) angle += 360;
-  while (angle >= 360) angle -= 360;
-  if (duty < 0) duty = 0;
-  if (duty > 255) duty = 255;
+  float complex v = cexpf(I * f_pi / 180.0f * angle) * duty / 255.0f;
+  set_modulation_vector(v);
+}
+
+float complex get_current_vector()
+{
+  int phase1_mA, phase3_mA;
+  motor_get_currents(&phase1_mA, &phase3_mA);
   
-  // CCRx = PWM_MAX_DUTY * (sine_table/255) * (duty/255)
-  // => CCRx = sine_table * (duty * PWM_MAX * 256 / (255 * 255)) / 256;
-  // This precalc avoids divisions later in the computation.
-  duty = duty * PWM_MAX_DUTY * 256 / (255 * 255);
- 
-  // Trapezoidal drive waveforms
-  TIM1->CCR1 = g_trapezoid_table[(angle + 240) % 360] * duty / 256;
-  TIM1->CCR2 = g_trapezoid_table[(angle + 120) % 360] * duty / 256;
-  TIM1->CCR3 = g_trapezoid_table[(angle +   0) % 360] * duty / 256;
+  float phase1_A = phase1_mA / 1000.0f;
+  float phase3_A = phase3_mA / 1000.0f;
+  float phase2_A = -(phase1_A + phase3_A);
   
-  // Sinusoidal drive waveforms based on http://www.atmel.com/Images/doc8030.pdf
-  if (angle < 120)
+  return f_v1 * phase1_A + f_v2 * phase2_A + f_v3 * phase3_A;
+}
+
+static float g_foc_torque_current = -1.0f;
+static float complex g_foc_I_accumulator = 0.0f;
+static float complex g_debug_latest_I_vector = 0.0f;
+static float complex g_debug_latest_U_vector = 0.0f;
+
+void get_foc_debug(float complex *i_vector, float complex *u_vector)
+{
+  *i_vector = g_debug_latest_I_vector;
+  *u_vector = g_debug_latest_U_vector;
+}
+
+static void do_field_oriented_control(bool do_modulation)
+{
+  // Get vector for rotor orientation
+  float rotor_angle = get_motor_orientation();
+  float complex rotor_vector = cexpf(I * f_pi / 180.0f * rotor_angle);
+  
+  // Project the current vector to rotor coordinates
+  float complex current = get_current_vector();
+  current *= conjf(rotor_vector);
+  g_debug_latest_I_vector = current;
+  
+  // Do PI control to match the requested torque
+  // Current varies from 0..MAX_MOTOR_CURRENT.
+  // The voltage vector length varies 0..1
+  float complex reference = I * g_foc_torque_current;
+  float complex error = reference - current;
+  g_foc_I_accumulator += FOC_I_TERM * error;
+  float complex voltage = reference + FOC_P_TERM * error + g_foc_I_accumulator;
+  voltage /= MAX_MOTOR_CURRENT;
+  
+  float vabs = cabsf(voltage);
+  if (vabs > 1.0f)
   {
-    // Phase1 = sin(angle), Phase2 = 0, Phase3 = sin(120-angle)
-    TIM1->CCR1 = g_sine_table[angle] * duty / 256;
-    TIM1->CCR2 = 0;
-    TIM1->CCR3 = g_sine_table[120-angle] * duty / 256;
+    // Value has saturated
+    voltage /= vabs;
   }
-  else if (angle < 240)
+  
+  float iabs = cabsf(g_foc_I_accumulator);
+  if (iabs > MAX_MOTOR_CURRENT)
   {
-    // Phase1 = sin(240-angle), Phase2 = sin(angle-120), Phase3 = 0
-    TIM1->CCR1 = g_sine_table[240-angle] * duty / 256;
-    TIM1->CCR2 = g_sine_table[angle-120] * duty / 256;
-    TIM1->CCR3 = 0;
+    // Prevent integrator windup
+    g_foc_I_accumulator *= MAX_MOTOR_CURRENT / iabs;
   }
-  else
+  
+  g_debug_latest_U_vector = voltage;
+  
+  if (do_modulation)
   {
-    // Phase1 = 0, Phase2 = sin(360-angle), Phase3 = sin(angle-240)
-    TIM1->CCR1 = 0;
-    TIM1->CCR2 = g_sine_table[360-angle] * duty / 256;
-    TIM1->CCR3 = g_sine_table[angle-240] * duty / 256;
+    // Project voltage vector back to stator coordinates
+    voltage *= rotor_vector;
+    set_modulation_vector(voltage);
   }
 }
 
-static int g_motor_run_duty = -1;
-static int g_motor_run_advance = 0;
+static int g_interrupt_time;
 
 CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
 {
-  // In center-aligned PWM mode, update events occur twice every period.
   TIM1->SR &= ~TIM_SR_UIF;
   
-  if (TIM1->CR1 & TIM_CR1_DIR)
+  update_motor_orientation();
+  motor_sampling_store();
+  motor_sampling_update();
+  
+  if (g_foc_torque_current >= 0.0f)
   {
-    update_motor_orientation(PWM_FREQ);
-    motor_sampling_store();
-    
-    if (g_motor_run_duty >= 0)
-    {
-      int angle = get_motor_orientation() + g_motor_run_advance;
-      set_motor_pwm(angle, g_motor_run_duty);
-    }
+    // Do FOC commutation
+    do_field_oriented_control(true);
   }
+  else
+  {
+    // Dry-run to get samples of the vectors that would have been set
+    do_field_oriented_control(false);
+  }
+  
+  int irq_time = TIM1->CNT;
+  if (irq_time > g_interrupt_time)
+      g_interrupt_time = irq_time;
+}
+
+int motor_get_interrupt_time()
+{
+  return g_interrupt_time;
 }
 
 void motor_run(int duty, int advance)
 {
-  g_motor_run_advance = advance;
-  g_motor_run_duty = duty;
+  g_foc_torque_current = MAX_MOTOR_CURRENT * duty / 255.0f;
 }
 
 void start_motor_control()
 {
-  g_motor_run_duty = -1;
-  g_motor_run_advance = 0;
+  g_foc_torque_current = -1.0f;
+  g_foc_I_accumulator = 0.0f;
   
   // Enable timer clock
   RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
@@ -154,24 +178,24 @@ void start_motor_control()
   TIM1->CNT = 0;
   TIM1->PSC = STM32_TIMCLK2 / (2 * PWM_FREQ * PWM_MAX) - 1;
   TIM1->ARR = PWM_MAX - 1;
+  TIM1->RCR = (PWM_FREQ * 2) / CONTROL_FREQ - 1;
   TIM1->BDTR = 84; // 0.5µs dead time
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
   TIM1->EGR = TIM_EGR_UG;
   
   // Uses CC4 to generate a pulse during the off cycle, for current sampling.
   // PWM_MAX_DUTY ensures there is enough off time for the sampling to occur.
-  TIM1->CCR4 = PWM_MAX - 2;
+  TIM1->CCR4 = PWM_MAX - 20;
+  motor_sampling_start();
   
   // Enable interrupt for performing motor control
   TIM1->DIER |= TIM_DIER_UIE;
-  nvicEnableVector(STM32_TIM1_UP_NUMBER, 5);
+  nvicEnableVector(STM32_TIM1_UP_NUMBER, 0);
   
   // Start the timer
   TIM1->CR1 |= TIM_CR1_CEN;
   TIM1->BDTR |= TIM_BDTR_MOE;
   palSetPad(GPIOB, GPIOB_EN_GATE);
-  
-  motor_sampling_start();
 }
 
 void stop_motor_control()
