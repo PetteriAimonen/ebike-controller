@@ -11,6 +11,7 @@ static int g_motor_rpm_adj_P;
 static int g_motor_lockcount;
 static int g_hall_time_since_change;
 static int g_hall_prev_angle;
+static float g_motor_filtered_rpm;
 
 #define LOCK_THRESHOLD 5
 
@@ -25,7 +26,7 @@ static int g_hall_prev_angle;
 // 101=5    6
 const int g_hall_table[8] = {-1, 1, 3, 2, 5, 6, 4, -1};
 
-int get_hall_sector()
+int motor_orientation_get_hall_sector()
 {
   uint32_t hall_state =
     (palReadPad(GPIOB, GPIOB_HALL_1) ? 1 : 0) |
@@ -43,9 +44,9 @@ static int angle_diff(int a, int b)
   return diff;
 }
 
-void update_motor_orientation()
+void motor_orientation_update()
 {
-  int sector = get_hall_sector();
+  int sector = motor_orientation_get_hall_sector();
   
   static int hall_error_count = 0;
   if (sector < 0)
@@ -117,9 +118,13 @@ void update_motor_orientation()
   if (new_angle >= 360) new_angle -= 360;
   g_motor_angle = new_angle;
   accumulator -= degs * acc_per_degree;
+  
+  // Filter the motor RPM estimate for less speed critical uses
+  float decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
+  g_motor_filtered_rpm = g_motor_filtered_rpm * (1 - decay) + g_motor_rpm * decay;
 }
 
-int get_motor_orientation()
+int motor_orientation_get_angle()
 {
   if (g_motor_lockcount > LOCK_THRESHOLD)
   {
@@ -131,12 +136,17 @@ int get_motor_orientation()
   }
 }
 
-int get_hall_angle()
+int motor_orientation_get_hall_angle()
 {
   return g_hall_prev_angle;
 }
 
-int get_motor_rpm()
+int motor_orientation_get_fast_rpm()
 {
   return g_motor_rpm;
+}
+
+int motor_orientation_get_rpm()
+{
+  return (int)g_motor_filtered_rpm;
 }

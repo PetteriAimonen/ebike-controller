@@ -88,7 +88,7 @@ static void cmd_motor_pwm(BaseSequentialStream *chp, int argc, char *argv[])
   
   int b = 0;
   do {
-    chprintf(chp, "Hall sector: %d\r\n", get_hall_sector());
+    chprintf(chp, "Hall sector: %d\r\n", motor_orientation_get_hall_sector());
     
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
@@ -125,34 +125,36 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
     
     char buf[64];
     chsnprintf(buf, sizeof(buf), "%4d %4d %4d %4d\r\n",
-               angle, get_motor_orientation(), get_motor_rpm(), get_hall_angle());
+               angle, motor_orientation_get_angle(), motor_orientation_get_fast_rpm(), motor_orientation_get_hall_angle());
     chSequentialStreamWrite(chp, (void*)buf, strlen(buf));
   } while (argc > 0 && b != Q_RESET && b != '\r');
   
   stop_motor_control();
 }
 
-static void cmd_motor_go_fast(BaseSequentialStream *chp, int argc, char *argv[])
+static void cmd_motor_run(BaseSequentialStream *chp, int argc, char *argv[])
 {
-  if (argc < 1)
+  if (argc < 2)
   {
-    chprintf(chp, "Usage: motor_go_fast <pwm> <advance>\r\n");
+    chprintf(chp, "Usage: motor_run <torque_mA> <advance_deg>\r\n");
     return;
   }
   
-  int pwm = atoi(argv[0]);
+  int torque_mA = atoi(argv[0]);
   int advance = atoi(argv[1]);
   start_motor_control();
   
-  motor_run(pwm, advance);
+  motor_run(torque_mA, advance);
   
   int b = 0;
+  int i = 0;
   do {
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));    
     
-    chprintf(chp, "%6d RPM, %6d V, %6d mA, %d ticks\r\n",
-             get_motor_rpm(), get_battery_voltage_mV(), get_battery_current_mA(),
+    chprintf(chp, "%6d %6d RPM, %6d mV, %6d mA, %6d Tmotor, %6d Tmosfet, %d ticks\r\n",
+             i++, motor_orientation_get_fast_rpm(), get_battery_voltage_mV(), get_battery_current_mA(),
+             get_motor_temperature_mC() / 1000, get_mosfet_temperature_mC() / 1000,
              motor_get_interrupt_time()
             );
   } while (argc > 0 && b != Q_RESET && b != '\r');
@@ -172,7 +174,7 @@ const ShellCommand shell_commands[] = {
   {"hall", cmd_hall},
   {"motor_pwm", cmd_motor_pwm},
   {"motor_rotate", cmd_motor_rotate},
-  {"motor_go_fast", cmd_motor_go_fast},
+  {"motor_run", cmd_motor_run},
   {"motor_samples", cmd_motor_samples},
   {NULL, NULL}
 };

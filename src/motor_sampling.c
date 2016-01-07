@@ -5,11 +5,10 @@
 #include <chprintf.h>
 #include <string.h>
 #include "debug.h"
+#include "motor_config.h"
 #include "motor_control.h"
 #include "motor_sampling.h"
 #include "motor_orientation.h"
-
-#define SHUNT_mA_PER_ADC_VAL 8
 
 typedef struct {
   uint8_t motor_orientation;
@@ -30,14 +29,13 @@ static volatile motor_sample_t g_motor_samples[MOTOR_SAMPLE_COUNT] __attribute__
 static volatile int g_motor_samples_writeidx;
 static volatile bool g_enable_sampling;
 
-void motor_sampling_start()
+void motor_sampling_init()
 {
   // Dual ADC mode with simultaneous injected conversion.
   RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN;
   ADC->CCR = STM32_ADC_ADCPRE | ADC_CCR_MULTI_2 | ADC_CCR_MULTI_0;
-  ADC1->CR1 = ADC2->CR1 = 0;
+  ADC1->CR1 = ADC2->CR1 = ADC_CR1_SCAN;
   ADC1->CR2 = ADC2->CR2 = ADC_CR2_ADON;
-  
   
   // 3 cycle sampling for all channels
   ADC1->SMPR1 = ADC2->SMPR1 = 0;
@@ -56,9 +54,7 @@ void motor_sampling_start()
   
   // Calculate DC offset
   ADC1->JOFR1 = ADC2->JOFR1 = 0;
-  TIM1->BDTR &= ~TIM_BDTR_MOE;
   palSetPad(GPIOA, GPIOA_DC_CAL);
-  palSetPad(GPIOB, GPIOB_EN_GATE);
   chThdSleepMilliseconds(50);
   
   // Take average of 10 samples
@@ -81,12 +77,95 @@ void motor_sampling_start()
 
 void motor_get_currents(int *phase1_mA, int *phase3_mA)
 {
-  // Note: br1 is phase3 and br2 is phase1, phase2 is the sum.
-  int16_t br1 = ADC1->JDR1;
-  int16_t br2 = ADC2->JDR1;
-  *phase1_mA = br2 * SHUNT_mA_PER_ADC_VAL;
-  *phase3_mA = br1 * SHUNT_mA_PER_ADC_VAL;
+  if (TIM1->BDTR & TIM_BDTR_MOE)
+  {
+    // Note: br1 is phase3 and br2 is phase1, phase2 is the sum.
+    int16_t br1 = ADC1->JDR1;
+    int16_t br2 = ADC2->JDR1;
+    *phase1_mA = br2 * SHUNT_uA_PER_ADC_VAL / 1000;
+    *phase3_mA = br1 * SHUNT_uA_PER_ADC_VAL / 1000;
+  }
+  else
+  {
+    // No info available while braking
+    *phase1_mA = 0;
+    *phase3_mA = 0;
+  }
 }
+
+static float g_battery_current = 0.0f;
+static float g_battery_voltage = 0.0f;
+static float g_motor_temperature = 0.0f;
+static float g_mosfet_temperature = 0.0f;
+
+static float ntc_to_millicelcius(float ohms_25C, float beta, float adc_ohms)
+{
+  return 1000.0f / ((1.0f / 25.0f) + (1.0f / beta) * logf(adc_ohms / ohms_25C));
+}
+
+void motor_sampling_update()
+{
+  float decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
+  
+  /* Estimate battery voltage */
+  float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
+  g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
+  
+  /* Estimate phase voltages */
+  float pwm_max = TIM1->ARR;
+  float ph3 = TIM1->CCR1 / pwm_max;
+  float ph2 = TIM1->CCR2 / pwm_max;
+  float ph1 = TIM1->CCR3 / pwm_max;
+  float vgnd = (ph1 + ph2 + ph3) / 3.0f;
+  ph1 -= vgnd;
+  ph2 -= vgnd;
+  ph3 -= vgnd;
+  
+  /* Estimate battery current */
+  int i1, i3;
+  motor_get_currents(&i1, &i3);
+  int i2 = -(i1 + i3);
+  float mA = i1 * ph1 + i2 * ph2 + i3 * ph3;
+  g_battery_current = g_battery_current * (1 - decay) + mA * decay;
+  
+  /* Estimate MOSFET temperature */
+  // adc_val = 4096 * 10k / (10k + ntc)
+  // =>  ntc = (4096 * 10k) / adc_val - 10k
+  float ohms = (4096.0f * 10000.0f) / ADC1->JDR3 - 10000.0f;
+  float mC = ntc_to_millicelcius(10000, 3428, ohms);
+  g_mosfet_temperature = g_mosfet_temperature * (1 - decay) + mC * decay;
+  
+  /* Estimate motor temperature */
+  // adc_val = 4096 * ntc / (10k + ntc)
+  // =>  1/adc_val = 10k/(4096*ntc) + 1/4096
+  // =>  10k/(4096*ntc) = 1/adc_val - 1/4096
+  // =>  ntc = 1 / (4096/(10k * adc_val) - 1/10k)
+  ohms = 1.0f / (4096.0f / (10000.0f * ADC2->JDR2) - 1.0f/10000.0f);
+  mC = ntc_to_millicelcius(10000, 3428, ohms);
+  g_motor_temperature = g_motor_temperature * (1 - decay) + mC * decay;
+}
+
+int get_battery_current_mA()
+{
+  return (int)g_battery_current;
+}
+
+int get_battery_voltage_mV()
+{
+  return (int)g_battery_voltage;
+}
+
+int get_motor_temperature_mC()
+{
+  return (int)g_motor_temperature;
+}
+
+int get_mosfet_temperature_mC()
+{
+  return (int)g_mosfet_temperature;
+}
+
+/* Sample buffer for debugging */
 
 static int8_t clamp(float x)
 {
@@ -99,8 +178,8 @@ static int8_t clamp(float x)
 void motor_sampling_store()
 {
   motor_sample_t sample = {};
-  sample.motor_orientation = get_motor_orientation() / 2;
-  sample.hall_angle = get_hall_angle() / 2;
+  sample.motor_orientation = motor_orientation_get_angle() / 2;
+  sample.hall_angle = motor_orientation_get_hall_angle() / 2;
   sample.ph3 = TIM1->CCR1 / 4;
   sample.ph2 = TIM1->CCR2 / 4;
   sample.ph1 = TIM1->CCR3 / 4;
@@ -112,8 +191,8 @@ void motor_sampling_store()
   
   float complex ivector, uvector;
   get_foc_debug(&ivector, &uvector);
-  sample.ivector_r = clamp(crealf(ivector) * 10.0f);
-  sample.ivector_i = clamp(cimagf(ivector) * 10.0f);
+  sample.ivector_r = clamp(crealf(ivector) / 100.0f);
+  sample.ivector_i = clamp(cimagf(ivector) / 100.0f);
   sample.uvector_r = clamp(crealf(uvector) * 100.0f);
   sample.uvector_i = clamp(cimagf(uvector) * 100.0f);
   
@@ -145,44 +224,5 @@ void motor_sampling_print(BaseSequentialStream *stream)
   }
   
   g_enable_sampling = true;
-}
-
-static float g_battery_current = 0.0f;
-static float g_battery_voltage = 0.0f;
-
-void motor_sampling_update()
-{
-  float decay = 0.01f;
-  
-  /* Estimate battery voltage */
-  float mV = ADC1->JOFR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
-  g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
-  
-  /* Estimate battery current */
-  float pwm_max = TIM1->ARR;
-  float ph3 = TIM1->CCR1 / pwm_max;
-  float ph2 = TIM1->CCR2 / pwm_max;
-  float ph1 = TIM1->CCR3 / pwm_max;
-  int i1, i3;
-  motor_get_currents(&i1, &i3);
-  int i2 = -(i1 + i3);
-  
-  float vgnd = (ph1 + ph2 + ph3) / 3.0f;
-  ph1 -= vgnd;
-  ph2 -= vgnd;
-  ph3 -= vgnd;
-  
-  float mA = i1 * ph1 + i2 * ph2 + i3 * ph3;
-  g_battery_current = g_battery_current * (1 - decay) + mA * decay;
-}
-
-int get_battery_current_mA()
-{
-  return (int)g_battery_current;
-}
-
-int get_battery_voltage_mV()
-{
-  return (int)g_battery_voltage;
 }
 

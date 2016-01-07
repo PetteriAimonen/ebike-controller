@@ -8,6 +8,7 @@
 #include "motor_config.h"
 #include "motor_orientation.h"
 #include "motor_sampling.h"
+#include "motor_limits.h"
 
 // Some useful constants
 static const float f_pi = 3.14159265f;
@@ -17,7 +18,18 @@ static const float complex f_v1 = 1.0f; // 0 deg angle
 static const float complex f_v2 = -0.5f + 0.866025fi; // +120 deg angle
 static const float complex f_v3 = -0.5f - 0.866025fi; // +240 deg angle
 
-// GCC's cabsf is a bit slowish for some reason..
+// FOC state variables
+static volatile bool g_foc_enabled = false;
+static float g_foc_torque_current = 0.0f;
+static int g_foc_advance = 0;
+static float complex g_foc_I_accumulator = 0.0f;
+
+// Debug information
+static float complex g_debug_latest_I_vector = 0.0f;
+static float complex g_debug_latest_U_vector = 0.0f;
+static int g_interrupt_time;
+
+// GCC's cabsf is a bit slowish for some reason, so replace it with our own.
 float cabsf(float complex x)
 {
   float i = cimagf(x);
@@ -42,7 +54,7 @@ void set_modulation_vector(float complex v)
   
   // Convert to integers for PWM
   // Note: CCR1 channel is connected to phase3 and CCR3 to phase1.
-  float scaler = PWM_MAX_DUTY / f_sqrt3;
+  float scaler = motor_limits_get_max_duty() / f_sqrt3;
   TIM1->CCR3 = (int)roundf(u1 * scaler);
   TIM1->CCR2 = (int)roundf(u2 * scaler);
   TIM1->CCR1 = (int)roundf(u3 * scaler);
@@ -59,28 +71,17 @@ float complex get_current_vector()
   int phase1_mA, phase3_mA;
   motor_get_currents(&phase1_mA, &phase3_mA);
   
-  float phase1_A = phase1_mA / 1000.0f;
-  float phase3_A = phase3_mA / 1000.0f;
+  float phase1_A = phase1_mA;
+  float phase3_A = phase3_mA;
   float phase2_A = -(phase1_A + phase3_A);
   
-  return f_v1 * phase1_A + f_v2 * phase2_A + f_v3 * phase3_A;
-}
-
-static float g_foc_torque_current = -1.0f;
-static float complex g_foc_I_accumulator = 0.0f;
-static float complex g_debug_latest_I_vector = 0.0f;
-static float complex g_debug_latest_U_vector = 0.0f;
-
-void get_foc_debug(float complex *i_vector, float complex *u_vector)
-{
-  *i_vector = g_debug_latest_I_vector;
-  *u_vector = g_debug_latest_U_vector;
+  return (f_v1 * phase1_A + f_v2 * phase2_A + f_v3 * phase3_A) / 2.0f;
 }
 
 static void do_field_oriented_control(bool do_modulation)
 {
   // Get vector for rotor orientation
-  float rotor_angle = get_motor_orientation();
+  float rotor_angle = motor_orientation_get_angle() + g_foc_advance;
   float complex rotor_vector = cexpf(I * f_pi / 180.0f * rotor_angle);
   
   // Project the current vector to rotor coordinates
@@ -121,17 +122,15 @@ static void do_field_oriented_control(bool do_modulation)
   }
 }
 
-static int g_interrupt_time;
-
 CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
 {
   TIM1->SR &= ~TIM_SR_UIF;
   
-  update_motor_orientation();
-  motor_sampling_store();
+  motor_orientation_update();
   motor_sampling_update();
+  motor_sampling_store();
   
-  if (g_foc_torque_current >= 0.0f)
+  if (g_foc_enabled)
   {
     // Do FOC commutation
     do_field_oriented_control(true);
@@ -141,6 +140,20 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
     // Dry-run to get samples of the vectors that would have been set
     do_field_oriented_control(false);
   }
+  
+  if ((TIM1->BDTR & TIM_BDTR_MOE) == 0)
+  {
+    // Start smoothly after brake is released.
+    g_foc_I_accumulator = 0;
+  }
+  
+  // Reset the EN_GATE deadline timer
+  if (TIM3->CNT < 3)
+  {
+    abort_with_error("IRQ WDOG");
+  }
+  
+  TIM3->CNT = 10;
   
   int irq_time = TIM1->CNT;
   if (irq_time > g_interrupt_time)
@@ -152,14 +165,25 @@ int motor_get_interrupt_time()
   return g_interrupt_time;
 }
 
-void motor_run(int duty, int advance)
+void get_foc_debug(float complex *i_vector, float complex *u_vector)
 {
-  g_foc_torque_current = MAX_MOTOR_CURRENT * duty / 255.0f;
+  *i_vector = g_debug_latest_I_vector;
+  *u_vector = g_debug_latest_U_vector;
+}
+
+void motor_run(int torque_current_mA, int advance_deg)
+{
+  if (torque_current_mA < -MAX_MOTOR_CURRENT) torque_current_mA = -MAX_MOTOR_CURRENT;
+  if (torque_current_mA > MAX_MOTOR_CURRENT) torque_current_mA = MAX_MOTOR_CURRENT;
+  g_foc_torque_current = torque_current_mA;
+  g_foc_advance = advance_deg;
+  g_foc_enabled = true;
 }
 
 void start_motor_control()
 {
-  g_foc_torque_current = -1.0f;
+  g_foc_enabled = false;
+  g_foc_torque_current = 0.0f;
   g_foc_I_accumulator = 0.0f;
   
   // Enable timer clock
@@ -183,12 +207,34 @@ void start_motor_control()
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
   TIM1->EGR = TIM_EGR_UG;
   
-  // Uses CC4 to generate a pulse during the off cycle, for current sampling.
+  // Brake input goes low when the brake lever is pulled.
+  // Automatically resume after it is released.
+  TIM1->BDTR |= TIM_BDTR_AOE | TIM_BDTR_BKE;
+  
+  // We use CC4 to generate a pulse during the off cycle for current sampling.
   // PWM_MAX_DUTY ensures there is enough off time for the sampling to occur.
-  TIM1->CCR4 = PWM_MAX - 20;
-  motor_sampling_start();
+  TIM1->CCR4 = PWM_MAX - 5;
+  
+  // TIM3 CH1 is used for the gate enable signal. This way the mosfets will be
+  // disabled automatically if the code is e.g. stopped in a debugger.
+  // It is setup to count downwards at CONTROL_FREQ, if it reaches zero
+  // it will disable EN_GATE.
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+  TIM3->CR1 = TIM_CR1_OPM | TIM_CR1_DIR;
+  TIM3->CCMR1 = 0x0070;
+  TIM3->CCR1 = 1;
+  TIM3->CCER = TIM_CCER_CC1E;
+  TIM3->PSC = STM32_TIMCLK1 / CONTROL_FREQ - 1;
+  TIM3->ARR = CONTROL_FREQ; // Not used, one pulse mode
+  TIM3->CNT = CONTROL_FREQ; // For DC offset calibration
+  TIM3->CR1 |= TIM_CR1_CEN;
+  
+  // Initialize the ADC sampling. This performs DC offset calibration so it
+  // has to happen before enabling timer, but after EN_GATE is enabled.
+  motor_sampling_init();
   
   // Enable interrupt for performing motor control
+  TIM3->CNT = 10;
   TIM1->DIER |= TIM_DIER_UIE;
   nvicEnableVector(STM32_TIM1_UP_NUMBER, 0);
   
@@ -200,7 +246,8 @@ void start_motor_control()
 
 void stop_motor_control()
 {
-  palClearPad(GPIOB, GPIOB_EN_GATE);
   TIM1->BDTR &= ~TIM_BDTR_MOE;
   TIM1->CR1 &= ~TIM_CR1_CEN;
+  nvicDisableVector(STM32_TIM1_UP_NUMBER);
+  TIM3->CNT = 0;
 }

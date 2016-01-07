@@ -35,9 +35,9 @@ void dbg(const char *fmt, ...)
 
 void abort_with_error(const char *fmt, ...)
 {
-  palClearPad(GPIOB, GPIOB_EN_GATE);
   TIM1->BDTR &= ~TIM_BDTR_MOE;
   TIM1->CR1 &= ~TIM_CR1_CEN;
+  TIM3->CNT = 0;
   
   for (;;)
   {
