@@ -4,6 +4,7 @@
 #include "board.h"
 #include "usb_usart.h"
 #include "bluetooth_usart.h"
+#include "filesystem.h"
 
 void enable_trace()
 {
@@ -44,6 +45,8 @@ int main(void)
     shellInit();
 
     start_bluetooth_shell();
+    
+    filesystem_init();
     
 //     enable_trace();
     

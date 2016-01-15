@@ -10,6 +10,7 @@
 #include "motor_control.h"
 #include "motor_orientation.h"
 #include "motor_sampling.h"
+#include <ff.h>
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -167,6 +168,56 @@ static void cmd_motor_samples(BaseSequentialStream *chp, int argc, char *argv[])
   motor_sampling_print(chp);
 }
 
+static void cmd_ls(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  DIR directory;
+  FILINFO file;
+  FRESULT status;
+  
+  status = f_opendir(&directory, "/");
+  
+  if (status != FR_OK)
+  {
+    chprintf(chp, "Failed to open SD card: %d\r\n", status);
+    return;
+  }
+  
+  while ((status = f_readdir(&directory, &file)) == FR_OK
+         && file.fname[0] != '\0')
+  {
+    chprintf(chp, "%8ld %s\r\n", file.fsize, file.fname);
+  }
+}
+
+static void cmd_cat(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc == 0)
+  {
+    chprintf(chp, "usage: cat <file>\r\n");
+    return;
+  }
+  
+  FIL f;
+  FRESULT status;
+  status = f_open(&f, argv[0], FA_READ);
+  
+  if (status != FR_OK)
+  {
+    chprintf(chp, "Failed to open file: %d\r\n", status);
+    return;
+  }
+  
+  char buf[128];
+  unsigned bytes_read;
+  while ((status = f_read(&f, buf, sizeof(buf), &bytes_read)) == FR_OK
+         && bytes_read > 0)
+  {
+    chSequentialStreamWrite(chp, (void*)buf, bytes_read);
+  }
+  
+  f_close(&f);
+}
+
 const ShellCommand shell_commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
@@ -176,5 +227,7 @@ const ShellCommand shell_commands[] = {
   {"motor_rotate", cmd_motor_rotate},
   {"motor_run", cmd_motor_run},
   {"motor_samples", cmd_motor_samples},
+  {"ls", cmd_ls},
+  {"cat", cmd_cat},
   {NULL, NULL}
 };
