@@ -140,8 +140,16 @@ void motor_sampling_update()
   // =>  1/adc_val = 10k/(4096*ntc) + 1/4096
   // =>  10k/(4096*ntc) = 1/adc_val - 1/4096
   // =>  ntc = 1 / (4096/(10k * adc_val) - 1/10k)
-  ohms = 1.0f / (4096.0f / (10000.0f * ADC2->JDR2) - 1.0f/10000.0f);
-  mC = ntc_to_millicelcius(10000, 3428, ohms);
+  int adc = ADC2->JDR2;
+  if (adc < 10 || adc > 4090)
+  {
+    mC = 999999;
+  }
+  else
+  {
+    ohms = 1.0f / (4096.0f / (10000.0f * ADC2->JDR2) - 1.0f/10000.0f);
+    mC = ntc_to_millicelcius(10000, 3428, ohms);
+  }
   g_motor_temperature = g_motor_temperature * (1 - decay) + mC * decay;
 }
 

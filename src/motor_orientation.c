@@ -54,7 +54,7 @@ void motor_orientation_update()
     hall_error_count++;
     if (hall_error_count > 100)
     {
-      abort_with_error("HALL_ERROR");
+//       abort_with_error("HALL_ERROR");
     }
     return;
   }

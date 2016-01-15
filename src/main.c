@@ -5,6 +5,8 @@
 #include "usb_usart.h"
 #include "bluetooth_usart.h"
 #include "filesystem.h"
+#include "motor_control.h"
+#include "log.h"
 
 void enable_trace()
 {
@@ -47,6 +49,10 @@ int main(void)
     start_bluetooth_shell();
     
     filesystem_init();
+    
+    start_motor_control();
+    
+    start_log();
     
 //     enable_trace();
     

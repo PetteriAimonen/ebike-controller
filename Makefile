@@ -19,7 +19,7 @@ PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_com
 PROJECT_CSRC += src/motor_control.c src/motor_orientation.c src/motor_sampling.c src/motor_limits.c
 
 # Filesystem and logging
-PROJECT_CSRC += src/filesystem.c
+PROJECT_CSRC += src/filesystem.c src/log.c
 
 UADEFS =
 ULIBDIR = 

@@ -84,7 +84,6 @@ static void cmd_motor_pwm(BaseSequentialStream *chp, int argc, char *argv[])
     return;
   }
   
-  start_motor_control();
   set_motor_pwm(atoi(argv[0]), atoi(argv[1]));
   
   int b = 0;
@@ -94,8 +93,6 @@ static void cmd_motor_pwm(BaseSequentialStream *chp, int argc, char *argv[])
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
   } while (argc > 0 && b != Q_RESET && b != '\r');
-  
-  stop_motor_control();
 }
 
 static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
@@ -108,8 +105,6 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
   
   int rpm = atoi(argv[0]);
   int pwm = atoi(argv[1]);
-  
-  start_motor_control();
   
   int degs_per_ms = (rpm * 360) / 60000;
   if (degs_per_ms < 1) degs_per_ms = 1;
@@ -129,8 +124,6 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
                angle, motor_orientation_get_angle(), motor_orientation_get_fast_rpm(), motor_orientation_get_hall_angle());
     chSequentialStreamWrite(chp, (void*)buf, strlen(buf));
   } while (argc > 0 && b != Q_RESET && b != '\r');
-  
-  stop_motor_control();
 }
 
 static void cmd_motor_run(BaseSequentialStream *chp, int argc, char *argv[])
@@ -143,7 +136,6 @@ static void cmd_motor_run(BaseSequentialStream *chp, int argc, char *argv[])
   
   int torque_mA = atoi(argv[0]);
   int advance = atoi(argv[1]);
-  start_motor_control();
   
   motor_run(torque_mA, advance);
   
@@ -159,8 +151,6 @@ static void cmd_motor_run(BaseSequentialStream *chp, int argc, char *argv[])
              motor_get_interrupt_time()
             );
   } while (argc > 0 && b != Q_RESET && b != '\r');
-  
-  stop_motor_control();
 }
 
 static void cmd_motor_samples(BaseSequentialStream *chp, int argc, char *argv[])
