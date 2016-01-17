@@ -130,6 +130,12 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
   motor_sampling_update();
   motor_sampling_store();
   
+  if ((TIM1->BDTR & TIM_BDTR_MOE) == 0)
+  {
+    // Brake active, trigger ADC sampling manually
+    ADC1->CR2 |= ADC_CR2_JSWSTART;
+  }
+  
   if (g_foc_enabled)
   {
     // Do FOC commutation
@@ -178,6 +184,12 @@ void motor_run(int torque_current_mA, int advance_deg)
   g_foc_torque_current = torque_current_mA;
   g_foc_advance = advance_deg;
   g_foc_enabled = true;
+}
+
+void motor_stop()
+{
+  g_foc_torque_current = 0;
+  g_foc_enabled = false;
 }
 
 void start_motor_control()

@@ -12,6 +12,8 @@
 #include "motor_sampling.h"
 #include <ff.h>
 #include "sensor_task.h"
+#include "bike_control_task.h"
+#include "motor_limits.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -222,6 +224,18 @@ static void cmd_sensors(BaseSequentialStream *chp, int argc, char *argv[])
   } while (b != Q_RESET && b != '\r');
 }
 
+static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  chprintf(chp, "Battery voltage:      %8d mV\r\n", get_battery_voltage_mV());
+  chprintf(chp, "Battery current:      %8d mA\r\n", get_battery_current_mA());
+  chprintf(chp, "Motor temperature:    %8d mC\r\n", get_motor_temperature_mC());
+  chprintf(chp, "Mosfet temperature:   %8d mC\r\n", get_mosfet_temperature_mC());
+  chprintf(chp, "Motor RPM:            %8d\r\n",    motor_orientation_get_rpm());
+  chprintf(chp, "Acceleration level:   %8d mg\r\n", bike_control_get_acceleration_level());
+  chprintf(chp, "Motor target current: %8d mA\r\n", bike_control_get_motor_current());
+  chprintf(chp, "Motor max duty:       %8d\r\n",    motor_limits_get_max_duty());
+}
+
 const ShellCommand shell_commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
@@ -234,5 +248,6 @@ const ShellCommand shell_commands[] = {
   {"ls", cmd_ls},
   {"cat", cmd_cat},
   {"sensors", cmd_sensors},
+  {"status", cmd_status},
   {NULL, NULL}
 };

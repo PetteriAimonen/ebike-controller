@@ -8,6 +8,7 @@
 static volatile float g_accel_x, g_accel_y, g_accel_z;
 static THD_WORKING_AREA(sensorstack, 1024);
 static thread_t *g_sensor_thread;
+event_source_t g_sensor_data_event;
 
 void sensors_get_accel(int* x, int* y, int* z)
 {
@@ -62,6 +63,7 @@ static void sensor_thread(void *p)
       chSysUnlock();
       
       ticks_since_last_sample = 0;
+      chEvtBroadcast(&g_sensor_data_event);
     }
     else
     {
@@ -77,6 +79,7 @@ static void sensor_thread(void *p)
 
 void sensors_start()
 {
+  chEvtObjectInit(&g_sensor_data_event);
   g_sensor_thread = chThdCreateStatic(sensorstack, sizeof(sensorstack), NORMALPRIO + 5, sensor_thread, NULL);
 }
 

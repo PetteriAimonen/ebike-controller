@@ -142,10 +142,8 @@ void motor_sampling_update()
   g_mosfet_temperature = g_mosfet_temperature * (1 - decay) + mC * decay;
   
   /* Estimate motor temperature */
-  // adc_val = 4096 * ntc / (10k + ntc)
-  // =>  1/adc_val = 10k/(4096*ntc) + 1/4096
-  // =>  10k/(4096*ntc) = 1/adc_val - 1/4096
-  // =>  ntc = 1 / (4096/(10k * adc_val) - 1/10k)
+  // adc_val = 5/3.3 * 4096 * 4.7k / (4.7k + ntc)
+  // =>  ntc = (5/3.3 * 4096 * 4.7k) / adc_val - 4.7k
   int adc = ADC2->JDR2;
   if (adc < 50 || adc > 4050)
   {
@@ -153,7 +151,7 @@ void motor_sampling_update()
   }
   else
   {
-    ohms = 1.0f / (4096.0f / (10000.0f * ADC2->JDR2) - 1.0f/10000.0f);
+    ohms = (5.0f/3.3f * 4096.0f * 4700.0f) / adc - 4700.0f;
     mC = ntc_to_millicelsius(10000, 3428, ohms);
   }
   g_motor_temperature = g_motor_temperature * (1 - decay) + mC * decay;

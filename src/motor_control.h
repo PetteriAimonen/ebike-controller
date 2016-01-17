@@ -11,6 +11,7 @@
 void set_motor_pwm(int angle, int duty);
 
 void motor_run(int torque_current_mA, int advance);
+void motor_stop();
 
 void start_motor_control();
 void stop_motor_control();

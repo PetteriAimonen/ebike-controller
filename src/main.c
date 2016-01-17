@@ -6,8 +6,10 @@
 #include "bluetooth_usart.h"
 #include "filesystem.h"
 #include "motor_control.h"
+#include "motor_orientation.h"
 #include "log_task.h"
 #include "sensor_task.h"
+#include "bike_control_task.h"
 
 void enable_trace()
 {
@@ -41,6 +43,8 @@ void enable_trace()
   ITM->TER = 0xFFFFFFFF; // Enable all stimulus ports 
 }
 
+bool g_have_motor;
+
 int main(void)
 {
     halInit();
@@ -50,10 +54,16 @@ int main(void)
     start_bluetooth_shell();
     
     filesystem_init();
-    
     sensors_start();
-    start_motor_control();
-    start_log();
+    
+    g_have_motor = (motor_orientation_get_hall_sector() >= 0);
+    
+    if (g_have_motor)
+    {
+      start_motor_control();
+      start_log();
+      start_bike_control();
+    }
     
 //     enable_trace();
     

@@ -24,6 +24,9 @@ PROJECT_CSRC += src/lsm6ds3.c src/sensor_task.c
 # Filesystem and logging
 PROJECT_CSRC += src/filesystem.c src/log_task.c
 
+# Motion control
+PROJECT_CSRC += src/bike_control_task.c
+
 UADEFS =
 ULIBDIR = 
 ULIBS = -lm
