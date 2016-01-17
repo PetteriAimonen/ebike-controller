@@ -18,8 +18,11 @@ PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_com
 # Motor control
 PROJECT_CSRC += src/motor_control.c src/motor_orientation.c src/motor_sampling.c src/motor_limits.c
 
+# Sensors
+PROJECT_CSRC += src/lsm6ds3.c src/sensor_task.c
+
 # Filesystem and logging
-PROJECT_CSRC += src/filesystem.c src/log.c
+PROJECT_CSRC += src/filesystem.c src/log_task.c
 
 UADEFS =
 ULIBDIR = 

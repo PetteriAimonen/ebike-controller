@@ -98,9 +98,15 @@ static float g_battery_voltage = 0.0f;
 static float g_motor_temperature = 0.0f;
 static float g_mosfet_temperature = 0.0f;
 
-static float ntc_to_millicelcius(float ohms_25C, float beta, float adc_ohms)
+static float ntc_to_millicelsius(float ohms_25C, float beta, float adc_ohms)
 {
-  return 1000.0f / ((1.0f / 25.0f) + (1.0f / beta) * logf(adc_ohms / ohms_25C));
+  float T0 = 273.15f + 25.0f;
+  float R0 = ohms_25C;
+  float B = beta;
+  float R = adc_ohms;
+  
+  float T = 1.0f / (1 / B * logf(R / R0) + 1 / T0);
+  return 1000.0f * (T - 273.15f);
 }
 
 void motor_sampling_update()
@@ -132,7 +138,7 @@ void motor_sampling_update()
   // adc_val = 4096 * 10k / (10k + ntc)
   // =>  ntc = (4096 * 10k) / adc_val - 10k
   float ohms = (4096.0f * 10000.0f) / ADC1->JDR3 - 10000.0f;
-  float mC = ntc_to_millicelcius(10000, 3428, ohms);
+  float mC = ntc_to_millicelsius(10000, 3428, ohms);
   g_mosfet_temperature = g_mosfet_temperature * (1 - decay) + mC * decay;
   
   /* Estimate motor temperature */
@@ -141,14 +147,14 @@ void motor_sampling_update()
   // =>  10k/(4096*ntc) = 1/adc_val - 1/4096
   // =>  ntc = 1 / (4096/(10k * adc_val) - 1/10k)
   int adc = ADC2->JDR2;
-  if (adc < 10 || adc > 4090)
+  if (adc < 50 || adc > 4050)
   {
     mC = 999999;
   }
   else
   {
     ohms = 1.0f / (4096.0f / (10000.0f * ADC2->JDR2) - 1.0f/10000.0f);
-    mC = ntc_to_millicelcius(10000, 3428, ohms);
+    mC = ntc_to_millicelsius(10000, 3428, ohms);
   }
   g_motor_temperature = g_motor_temperature * (1 - decay) + mC * decay;
 }

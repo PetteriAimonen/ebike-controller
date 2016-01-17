@@ -11,7 +11,7 @@ static const ShellConfig btshellconfig = {
 
 static const SerialConfig serialconfig =
 {
-  9600,
+  115200,
   0,
   USART_CR2_STOP1_BITS | USART_CR2_LINEN,
   0

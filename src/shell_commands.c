@@ -11,6 +11,7 @@
 #include "motor_orientation.h"
 #include "motor_sampling.h"
 #include <ff.h>
+#include "sensor_task.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -208,6 +209,19 @@ static void cmd_cat(BaseSequentialStream *chp, int argc, char *argv[])
   f_close(&f);
 }
 
+static void cmd_sensors(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  int b = 0;
+  do {
+    int x, y, z;
+    sensors_get_accel(&x, &y, &z);
+    chprintf(chp, "%8d %8d %8d\r\n", x, y, z);
+    
+    // End if enter is pressed
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));
+  } while (b != Q_RESET && b != '\r');
+}
+
 const ShellCommand shell_commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
@@ -219,5 +233,6 @@ const ShellCommand shell_commands[] = {
   {"motor_samples", cmd_motor_samples},
   {"ls", cmd_ls},
   {"cat", cmd_cat},
+  {"sensors", cmd_sensors},
   {NULL, NULL}
 };
