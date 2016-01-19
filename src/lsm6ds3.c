@@ -98,7 +98,7 @@ bool lsm6ds3_read_acc(int* x, int* y, int* z)
   
   *x = x1;
   *y = y1;
-  *z = z1;
+  *z = -z1;
   return true;
 }
 

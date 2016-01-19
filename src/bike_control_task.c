@@ -44,7 +44,7 @@ static void bike_control_thread(void *p)
     
     // Total acceleration along the bike axis
     // Positive = speed increasing
-    float total_accel = - z * 0.00981f;
+    float total_accel = z * 0.00981f;
     
     // Calculate maximum amount of acceleration that might be due to our motor.
     float motor_accel = g_motor_current * MOTOR_NEWTON_PER_A / BIKE_MIN_WEIGHT;
