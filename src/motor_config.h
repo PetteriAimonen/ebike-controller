@@ -4,7 +4,7 @@
 #define HALL_OFFSET 210
 
 // Base frequency for PWM and control loop.
-#define PWM_FREQ 50000
+#define PWM_FREQ 25000
 #define CONTROL_FREQ 10000
 
 // PWM period, should be selected so that 168MHz / PWM_FREQ divides nicely.
