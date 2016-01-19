@@ -3,11 +3,8 @@
 #include "bike_control_task.h"
 #include "motor_control.h"
 #include "motor_config.h"
+#include "motor_orientation.h"
 #include "sensor_task.h"
-
-#define MOTOR_NEWTON_PER_A       5.0f
-#define BIKE_MIN_WEIGHT         20.0f
-#define BIKE_MAX_WEIGHT         90.0f
 
 static volatile float g_acceleration_level;
 static volatile float g_motor_current;
@@ -55,8 +52,8 @@ static void bike_control_thread(void *p)
     // Calculate how much acceleration is definitely due to cyclist
     float user_accel = total_accel - motor_accel;
     
-    // Keep track of the maximum user acceleration within last 5 seconds
-    float decay_down = delta_s / 5.0f;
+    // Keep track of the maximum user acceleration within last few seconds
+    float decay_down = delta_s / BIKE_ACCEL_SMOOTH_TIME;
     float decay_up = delta_s / 0.1f;
     if (user_accel > g_acceleration_level)
       g_acceleration_level = g_acceleration_level * (1 - decay_up) + user_accel * decay_up;
@@ -80,23 +77,31 @@ static void bike_control_thread(void *p)
       // Decide new motor current so that total_accel
       // stays at g_acceleration_level.
       float N_error = (g_acceleration_level - total_accel) * BIKE_MAX_WEIGHT;
-      float P_term = 0.1f;
-      float I_term = 0.05f;
-      float current = (P_term * N_error + g_control_I_accumulator) / MOTOR_NEWTON_PER_A;
+      float current = (BIKE_TORQUE_P_TERM * N_error + g_control_I_accumulator) / MOTOR_NEWTON_PER_A;
       int current_mA = (int)(current * 1000.0f);
       
-      if (current_mA < 100)
-        current_mA = 100;
+      // Do not apply full torque until motor has spun up.
+      // This provides for smooth startup, and also protects fingers ;)
+      int rpm = motor_orientation_get_rpm();
+      if (rpm < BIKE_SOFT_START_RPM)
+      {
+        current_mA = current_mA * rpm / BIKE_SOFT_START_RPM;
+      }
+      
+      // Always apply atleast this much current so that the motor will reliably start.
+      // Getting the motor to start is necessary to get correct RPM readings.
+      if (current_mA < BIKE_STARTUP_CURRENT_MA)
+        current_mA = BIKE_STARTUP_CURRENT_MA;
       
       if (current_mA < MAX_MOTOR_CURRENT)
       {
-        g_control_I_accumulator += I_term * N_error;
+        g_control_I_accumulator += BIKE_TORQUE_I_TERM * N_error;
       }
       else
       {
         current_mA = MAX_MOTOR_CURRENT;
       }
-    
+      
       g_motor_current = current_mA / 1000.0f;
       motor_run(current_mA, 0);
     }

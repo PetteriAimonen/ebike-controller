@@ -37,3 +37,13 @@
 #define BATTERY_MIN_VOLTAGE_B     30000
 #define BATTERY_MAX_CURRENT_A      7000
 #define BATTERY_MAX_CURRENT_B     10000
+
+// Bike control parameters
+#define MOTOR_NEWTON_PER_A         5.0f
+#define BIKE_MIN_WEIGHT           20.0f
+#define BIKE_MAX_WEIGHT           90.0f
+#define BIKE_ACCEL_SMOOTH_TIME     2.0f
+#define BIKE_STARTUP_CURRENT_MA  300
+#define BIKE_SOFT_START_RPM      600
+#define BIKE_TORQUE_P_TERM         0.1f
+#define BIKE_TORQUE_I_TERM         0.05f
