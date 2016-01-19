@@ -72,7 +72,8 @@ void motor_orientation_update()
     g_motor_rpm = 0;
   }
   
-  if (hall_angle != g_hall_prev_angle)
+  int delta = angle_diff(hall_angle, g_hall_prev_angle);
+  if (delta > 0)
   {
     // Moved from one sector to the next, current angle is
     // quite accurately in between the two.
@@ -104,8 +105,15 @@ void motor_orientation_update()
     g_hall_time_since_change = 0;
     g_hall_prev_angle = hall_angle;
   }
+  else if (delta < 0)
+  {
+    // Rotating backwards..
+    g_motor_rpm = 0;
+    g_motor_lockcount = 0;
+  }
   else
   {
+    // Between hall steps
     g_hall_time_since_change++;
   }
   
@@ -150,5 +158,8 @@ int motor_orientation_get_fast_rpm()
 
 int motor_orientation_get_rpm()
 {
-  return (int)g_motor_filtered_rpm;
+  if (g_motor_lockcount > 10)
+    return (int)g_motor_filtered_rpm;
+  else
+    return 0;
 }
