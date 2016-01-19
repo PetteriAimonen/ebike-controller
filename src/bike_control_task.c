@@ -77,7 +77,7 @@ static void bike_control_thread(void *p)
       g_control_I_accumulator = 0;
     }
     
-    if (g_acceleration_level > 0.05f)
+    if (g_acceleration_level > 0.1f)
     {
       // Decide new motor current so that total_accel
       // stays at g_acceleration_level.
@@ -98,13 +98,18 @@ static void bike_control_thread(void *p)
       if (current_mA < BIKE_STARTUP_CURRENT_MA)
         current_mA = BIKE_STARTUP_CURRENT_MA;
       
-      if (current_mA < MAX_MOTOR_CURRENT)
-      {
-        g_control_I_accumulator += BIKE_TORQUE_I_TERM * N_error;
-      }
-      else
-      {
+      // Never apply more than this current to avoid overheating the motor.
+      if (current_mA > MAX_MOTOR_CURRENT)
         current_mA = MAX_MOTOR_CURRENT;
+      
+      // Only update I term when current is between extremes
+      if (rpm > BIKE_SOFT_START_RPM)
+      {
+        if ((current_mA < MAX_MOTOR_CURRENT && N_error > 0) ||
+            (current_mA > BIKE_STARTUP_CURRENT_MA && N_error < 0))
+        {
+          g_control_I_accumulator += BIKE_TORQUE_I_TERM * N_error;
+        }
       }
       
       g_motor_current = current_mA / 1000.0f;
