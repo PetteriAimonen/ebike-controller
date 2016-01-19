@@ -93,7 +93,7 @@ bool lsm6ds3_read_acc(int* x, int* y, int* z)
     y2 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTY_L_XL) | ((int)lsm6ds3_read(LSM6DS3_OUTY_H_XL) << 8));
     z2 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTZ_L_XL) | ((int)lsm6ds3_read(LSM6DS3_OUTZ_H_XL) << 8));
     
-    if (maxwait-- < 0) abort_with_error("SPI_REREAD");
+    if (maxwait-- < 0) abort_with_error("ACC_REREAD");
   } while (x1 != x2 || y1 != y2 || z1 != z2);
   
   *x = x1;
@@ -101,4 +101,33 @@ bool lsm6ds3_read_acc(int* x, int* y, int* z)
   *z = -z1;
   return true;
 }
+
+bool lsm6ds3_read_gyro(int* x, int* y, int* z)
+{
+  int maxwait = 10;
+  
+  uint8_t status = lsm6ds3_read(LSM6DS3_STATUS_REG);
+  if (!(status & 2))
+    return false;
+  
+  int x1, y1, z1, x2, y2, z2;
+  do {
+    x1 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTX_L_G) | ((int)lsm6ds3_read(LSM6DS3_OUTX_H_G) << 8));
+    y1 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTY_L_G) | ((int)lsm6ds3_read(LSM6DS3_OUTY_H_G) << 8));
+    z1 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTZ_L_G) | ((int)lsm6ds3_read(LSM6DS3_OUTZ_H_G) << 8));
+  
+    // Double read to make sure the data is not updated in the middle
+    x2 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTX_L_G) | ((int)lsm6ds3_read(LSM6DS3_OUTX_H_G) << 8));
+    y2 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTY_L_G) | ((int)lsm6ds3_read(LSM6DS3_OUTY_H_G) << 8));
+    z2 = (int16_t)(lsm6ds3_read(LSM6DS3_OUTZ_L_G) | ((int)lsm6ds3_read(LSM6DS3_OUTZ_H_G) << 8));
+    
+    if (maxwait-- < 0) abort_with_error("GYR_REREAD");
+  } while (x1 != x2 || y1 != y2 || z1 != z2);
+  
+  *x = x1;
+  *y = y1;
+  *z = -z1;
+  return true;
+}
+
 

@@ -40,4 +40,4 @@ void lsm6ds3_init();
 void lsm6ds3_write(uint8_t reg, uint8_t value);
 uint8_t lsm6ds3_read(uint8_t reg);
 bool lsm6ds3_read_acc(int *x, int *y, int *z);
-
+bool lsm6ds3_read_gyro(int* x, int* y, int* z);

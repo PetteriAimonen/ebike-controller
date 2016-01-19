@@ -220,9 +220,10 @@ static void cmd_sensors(BaseSequentialStream *chp, int argc, char *argv[])
 {
   int b = 0;
   do {
-    int x, y, z;
+    int x, y, z, gx, gy, gz;
     sensors_get_accel(&x, &y, &z);
-    chprintf(chp, "%8d %8d %8d\r\n", x, y, z);
+    sensors_get_gyro(&gx, &gy, &gz);
+    chprintf(chp, "ACC: %8d %8d %8d    GYRO: %8d %8d %8d\r\n", x, y, z, gx, gy, gz);
     
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));

@@ -21,6 +21,11 @@ int bike_control_get_motor_current()
   return (int)(g_motor_current * 1000.0f);
 }
 
+int bike_control_get_I_accumulator()
+{
+  return (int)(g_control_I_accumulator / MOTOR_NEWTON_PER_A * 1000.0f);
+}
+
 static void bike_control_thread(void *p)
 {
   static event_listener_t el;    

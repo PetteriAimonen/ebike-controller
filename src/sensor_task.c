@@ -6,6 +6,7 @@
 #include "debug.h"
 
 static volatile float g_accel_x, g_accel_y, g_accel_z;
+static volatile float g_gyro_x, g_gyro_y, g_gyro_z;
 static THD_WORKING_AREA(sensorstack, 1024);
 static thread_t *g_sensor_thread;
 event_source_t g_sensor_data_event;
@@ -16,6 +17,19 @@ void sensors_get_accel(int* x, int* y, int* z)
   float xf = g_accel_x;
   float yf = g_accel_y;
   float zf = g_accel_z;
+  chSysUnlock();
+  
+  *x = roundf(xf);
+  *y = roundf(yf);
+  *z = roundf(zf);
+}
+
+void sensors_get_gyro(int* x, int* y, int* z)
+{
+  chSysLock();
+  float xf = g_gyro_x;
+  float yf = g_gyro_y;
+  float zf = g_gyro_z;
   chSysUnlock();
   
   *x = roundf(xf);
@@ -41,12 +55,31 @@ static void sensor_thread(void *p)
   // Configure accelerometer
   lsm6ds3_write(LSM6DS3_CTRL1_XL, 0x43); // Accelerometer samplerate 100Hz
   
+  // Configure gyroscope
+  lsm6ds3_write(LSM6DS3_CTRL2_G, 0x40);
+  
   int ticks_since_last_sample = 0;
   for(;;)
   {
     chThdSleepMilliseconds(5);
     
     int x, y, z;
+    if (lsm6ds3_read_gyro(&x, &y, &z))
+    {
+      float decay = 0.2f;
+      float scale = 0.00875f;
+      float xf = g_gyro_x, yf = g_gyro_y, zf = g_gyro_z;
+      xf = (x * scale) * decay + xf * (1 - decay);
+      yf = (y * scale) * decay + yf * (1 - decay);
+      zf = (z * scale) * decay + zf * (1 - decay);
+      
+      chSysLock();
+      g_gyro_x = xf;
+      g_gyro_y = yf;
+      g_gyro_z = zf;
+      chSysUnlock();
+    }
+    
     if (lsm6ds3_read_acc(&x, &y, &z))
     {
       float decay = 0.2f;

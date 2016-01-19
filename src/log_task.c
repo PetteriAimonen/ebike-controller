@@ -51,9 +51,9 @@ void log_saver_thread(void *p)
   f_open(&file, filename, FA_WRITE | FA_CREATE_NEW);
   
   static const char header[] = "# SysTime   BattU    BattI     Tmotor  Tmosfet     RPM     "
-                               "AccX    AccY    AccZ   TotAcc  MotorTgt  Brake  MaxDuty\r\n"
+                               "AccX    AccY    AccZ   GyrX    TotAcc  MotorTgt  IAccum   Brake  MaxDuty\r\n"
                                "#      ms      mV       mA         mC       mC             "
-                               "  mg      mg      mg       mg        mA                \r\n";
+                               "  mg      mg      mg    dps        mg        mA      mA                 \r\n";
   f_write(&file, header, sizeof(header) - 1, &bytes_written);
   
   for (;;)
@@ -84,19 +84,20 @@ void log_writer_thread(void *p)
   
   for (;;)
   {
-    chThdSleepMilliseconds(100);
+    chThdSleepMilliseconds(50);
     
-    int x, y, z;
+    int x, y, z, gx, gy, gz;
     sensors_get_accel(&x, &y, &z);
+    sensors_get_gyro(&gx, &gy, &gz);
     
     static char buf[512];
     chsnprintf(buf, sizeof(buf),
-             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d\r\n",
+             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d\r\n",
              chVTGetSystemTime(),
              get_battery_voltage_mV(), get_battery_current_mA(),
              get_motor_temperature_mC(), get_mosfet_temperature_mC(),
-             motor_orientation_get_rpm(), x, y, z,
-             bike_control_get_acceleration_level(), bike_control_get_motor_current(),
+             motor_orientation_get_rpm(), x, y, z, gx,
+             bike_control_get_acceleration_level(), bike_control_get_motor_current(), bike_control_get_I_accumulator(),
              !palReadPad(GPIOB, GPIOB_BRAKE), motor_limits_get_max_duty()
               );
     
