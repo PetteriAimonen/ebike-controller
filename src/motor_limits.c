@@ -30,7 +30,7 @@ int motor_limits_get_max_duty()
   int max_duty = PWM_MAX_DUTY;
   
   apply_limit(&max_duty, MOTOR_MAX_RPM_A, MOTOR_MAX_RPM_B, motor_orientation_get_rpm());
-  apply_limit(&max_duty, MOTOR_MAX_TEMP_A, MOTOR_MAX_TEMP_B, get_motor_temperature_mC());
+//   apply_limit(&max_duty, MOTOR_MAX_TEMP_A, MOTOR_MAX_TEMP_B, get_motor_temperature_mC());
   apply_limit(&max_duty, MOSFET_MAX_TEMP_A, MOSFET_MAX_TEMP_B, get_mosfet_temperature_mC());
   apply_limit(&max_duty, -BATTERY_MIN_VOLTAGE_A, -BATTERY_MIN_VOLTAGE_B, -get_battery_voltage_mV());
   apply_limit(&max_duty, BATTERY_MAX_CURRENT_A, BATTERY_MAX_CURRENT_B, get_battery_current_mA());
