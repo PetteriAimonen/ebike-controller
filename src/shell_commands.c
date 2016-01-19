@@ -79,6 +79,11 @@ static void cmd_hall(BaseSequentialStream *chp, int argc, char *argv[])
   } while (argc > 0 && b != Q_RESET && b != '\r');
 }
 
+static void cmd_start_motor_control(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  start_motor_control();
+}
+
 static void cmd_motor_pwm(BaseSequentialStream *chp, int argc, char *argv[])
 {
   if (argc < 2)
@@ -241,6 +246,7 @@ const ShellCommand shell_commands[] = {
   {"threads", cmd_threads},
   {"reboot", cmd_reboot},
   {"hall", cmd_hall},
+  {"start_motor_control", cmd_start_motor_control},
   {"motor_pwm", cmd_motor_pwm},
   {"motor_rotate", cmd_motor_rotate},
   {"motor_run", cmd_motor_run},

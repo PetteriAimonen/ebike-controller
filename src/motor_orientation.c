@@ -44,6 +44,8 @@ static int angle_diff(int a, int b)
   return diff;
 }
 
+extern bool g_have_motor;
+
 void motor_orientation_update()
 {
   int sector = motor_orientation_get_hall_sector();
@@ -52,9 +54,9 @@ void motor_orientation_update()
   if (sector < 0)
   {
     hall_error_count++;
-    if (hall_error_count > 100)
+    if (hall_error_count > 100 && g_have_motor)
     {
-//       abort_with_error("HALL_ERROR");
+      abort_with_error("HALL_ERROR");
     }
     return;
   }
