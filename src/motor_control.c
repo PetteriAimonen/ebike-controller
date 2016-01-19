@@ -134,6 +134,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
   {
     // Brake active, trigger ADC sampling manually
     ADC1->CR2 |= ADC_CR2_JSWSTART;
+    motor_limits_get_max_duty();
   }
   
   if (g_foc_enabled)
@@ -184,12 +185,15 @@ void motor_run(int torque_current_mA, int advance_deg)
   g_foc_torque_current = torque_current_mA;
   g_foc_advance = advance_deg;
   g_foc_enabled = true;
+  TIM1->BDTR |= TIM_BDTR_MOE;
 }
 
 void motor_stop()
 {
   g_foc_torque_current = 0;
   g_foc_enabled = false;
+  TIM1->BDTR &= ~TIM_BDTR_MOE; // Let the motor freewheel
+  TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
 }
 
 void start_motor_control()
@@ -220,8 +224,7 @@ void start_motor_control()
   TIM1->EGR = TIM_EGR_UG;
   
   // Brake input goes low when the brake lever is pulled.
-  // Automatically resume after it is released.
-  TIM1->BDTR |= TIM_BDTR_AOE | TIM_BDTR_BKE;
+  TIM1->BDTR |= TIM_BDTR_BKE;
   
   // We use CC4 to generate a pulse during the off cycle for current sampling.
   // PWM_MAX_DUTY ensures there is enough off time for the sampling to occur.
@@ -252,7 +255,6 @@ void start_motor_control()
   
   // Start the timer
   TIM1->CR1 |= TIM_CR1_CEN;
-  TIM1->BDTR |= TIM_BDTR_MOE;
   palSetPad(GPIOB, GPIOB_EN_GATE);
 }
 
