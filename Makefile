@@ -6,7 +6,7 @@ PROJECT = ebike-controller
 BUILDDIR = build
 UINCDIR += src
 
-USE_OPT += -Os -g -gdwarf-2 -g3 \
+USE_OPT += -Os -g -gdwarf-2 -g3 -Wno-unused \
         -fomit-frame-pointer -falign-functions=16 -std=gnu99 -ffast-math
 
 # Base system & bootup

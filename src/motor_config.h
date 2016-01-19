@@ -41,7 +41,7 @@
 // Bike control parameters
 #define MOTOR_NEWTON_PER_A         5.0f
 #define BIKE_MIN_WEIGHT           20.0f
-#define BIKE_MAX_WEIGHT           90.0f
+#define BIKE_MAX_WEIGHT          100.0f
 #define BIKE_ACCEL_SMOOTH_TIME     2.0f
 #define BIKE_STARTUP_CURRENT_MA 1000
 #define BIKE_SOFT_START_RPM      600

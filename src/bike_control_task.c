@@ -9,6 +9,8 @@
 static volatile float g_acceleration_level;
 static volatile float g_motor_current;
 static volatile float g_control_I_accumulator;
+static volatile int g_previous_rpm;
+static volatile float g_wheel_accel;
 static THD_WORKING_AREA(bikestack, 1024);
 
 int bike_control_get_acceleration_level()
@@ -34,6 +36,7 @@ static void bike_control_thread(void *p)
   chRegSetThreadName("bike_ctrl");
   
   systime_t start = chVTGetSystemTime();
+  bool braking = true;
   for (;;)
   {
     chEvtWaitAny(ALL_EVENTS);
@@ -50,40 +53,26 @@ static void bike_control_thread(void *p)
     // Total acceleration along the bike axis
     // Positive = speed increasing
     float total_accel = z * 0.00981f;
+    float decay = 0.01f;
+    g_acceleration_level = g_acceleration_level * (1-decay) + total_accel * decay;
     
-    // Calculate maximum amount of acceleration that might be due to our motor.
-    float motor_accel = g_motor_current * MOTOR_NEWTON_PER_A / BIKE_MIN_WEIGHT;
-    
-    // Calculate how much acceleration is definitely due to cyclist
-    float user_accel = total_accel - motor_accel;
-    
-    // Keep track of the maximum user acceleration within last few seconds
-    float decay_down = delta_s / BIKE_ACCEL_SMOOTH_TIME;
-    float decay_up = delta_s / 0.1f;
-    if (user_accel > g_acceleration_level)
-      g_acceleration_level = g_acceleration_level * (1 - decay_up) + user_accel * decay_up;
-    else
-      g_acceleration_level = g_acceleration_level * (1 - decay_down) + user_accel * decay_down;
-    
-    // Detect braking
     if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
     {
-      g_acceleration_level = 0;
-      g_control_I_accumulator = 0;
+      braking = true;
     }
-    if (total_accel < -0.1f)
+    else if (g_acceleration_level > 0.05f)
     {
-      g_acceleration_level = 0;
-      g_control_I_accumulator = 0;
+      braking = false;
+    }
+    else if (g_acceleration_level < -0.05f)
+    {
+      braking = true;
     }
     
-    if (g_acceleration_level > 0.1f)
+    if (!braking)
     {
-      // Decide new motor current so that total_accel
-      // stays at g_acceleration_level.
-      float N_error = (g_acceleration_level - total_accel) * BIKE_MAX_WEIGHT;
-      float current = (BIKE_TORQUE_P_TERM * N_error + g_control_I_accumulator) / MOTOR_NEWTON_PER_A;
-      int current_mA = (int)(current * 1000.0f);
+      float current = g_acceleration_level * 0.3f * BIKE_MAX_WEIGHT / MOTOR_NEWTON_PER_A;
+      int current_mA = (int)(current * 1000.0f) + BIKE_STARTUP_CURRENT_MA;
       
       // Do not apply full torque until motor has spun up.
       // This provides for smooth startup, and also protects fingers ;)
@@ -93,6 +82,18 @@ static void bike_control_thread(void *p)
         current_mA = current_mA * rpm / BIKE_SOFT_START_RPM;
       }
       
+      // Monitor the wheel acceleration for anti-slip
+//       float rpm_delta = rpm - g_previous_rpm;
+//       float wheel_accel_m2_per_s = (rpm_delta / 60 * 2.23f) / delta_s;
+//       float decay2 = 0.1f;
+//       g_wheel_accel = g_wheel_accel * (1 - decay2) + wheel_accel_m2_per_s * decay2;
+//       g_previous_rpm = rpm;
+//       
+//       if (g_wheel_accel > g_acceleration_level)
+//       {
+//         current_mA = current_mA * g_acceleration_level / g_wheel_accel;
+//       }
+//       
       // Always apply atleast this much current so that the motor will reliably start.
       // Getting the motor to start is necessary to get correct RPM readings.
       if (current_mA < BIKE_STARTUP_CURRENT_MA)
@@ -102,18 +103,10 @@ static void bike_control_thread(void *p)
       if (current_mA > MAX_MOTOR_CURRENT)
         current_mA = MAX_MOTOR_CURRENT;
       
-      // Only update I term when current is between extremes
-      if (rpm > BIKE_SOFT_START_RPM)
-      {
-        if ((current_mA < MAX_MOTOR_CURRENT && N_error > 0) ||
-            (current_mA > BIKE_STARTUP_CURRENT_MA && N_error < 0))
-        {
-          g_control_I_accumulator += BIKE_TORQUE_I_TERM * N_error;
-        }
-      }
-      
-      g_motor_current = current_mA / 1000.0f;
-      motor_run(current_mA, 0);
+      current = current_mA / 1000.0f;
+      float decay2 = 0.1f;
+      g_motor_current = g_motor_current * (1-decay2) + current * decay2;
+      motor_run((int)(g_motor_current * 1000.0f), 0);
     }
     else if (g_motor_current > 0)
     {

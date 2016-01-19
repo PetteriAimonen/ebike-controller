@@ -158,8 +158,5 @@ int motor_orientation_get_fast_rpm()
 
 int motor_orientation_get_rpm()
 {
-  if (g_motor_lockcount > 10)
-    return (int)g_motor_filtered_rpm;
-  else
-    return 0;
+  return (int)g_motor_filtered_rpm;
 }
