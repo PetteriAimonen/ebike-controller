@@ -37,6 +37,8 @@ static void bike_control_thread(void *p)
   
   systime_t start = chVTGetSystemTime();
   bool braking = true;
+  int stallcount = 100;
+  int brakelen = 0;
   for (;;)
   {
     chEvtWaitAny(ALL_EVENTS);
@@ -56,7 +58,34 @@ static void bike_control_thread(void *p)
     float decay = 0.01f;
     g_acceleration_level = g_acceleration_level * (1-decay) + total_accel * decay;
     
-    if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
+    int rpm = motor_orientation_get_rpm();
+    bool brake = (palReadPad(GPIOB, GPIOB_BRAKE) == 0);
+    
+    if (rpm < 60 && g_motor_current > 0)
+    {
+      stallcount++;
+    }
+    else if (stallcount >= 100)
+    {
+      if (brake)
+      {
+        brakelen++;
+      }
+      else
+      {
+        if (brakelen > 100 && brakelen < 500)
+        {
+          stallcount = 0;
+        }
+        brakelen = 0;
+      }
+    }
+    else
+    {
+      stallcount = 0;
+    }
+    
+    if (brake || stallcount >= 100)
     {
       braking = true;
     }
