@@ -10,6 +10,7 @@
 #include "log_task.h"
 #include "sensor_task.h"
 #include "bike_control_task.h"
+#include "ui_task.h"
 
 void enable_trace()
 {
@@ -55,6 +56,7 @@ int main(void)
     
     filesystem_init();
     sensors_start();
+    ui_start();
     
     g_have_motor = (motor_orientation_get_hall_sector() >= 0);
     
@@ -65,7 +67,7 @@ int main(void)
       start_bike_control();
     }
     
-//     enable_trace();
+    enable_trace();
     
     while (true)
     {

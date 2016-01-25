@@ -242,6 +242,55 @@ static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "Motor max duty:       %8d\r\n",    motor_limits_get_max_duty());
 }
 
+static void cmd_i2c(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc < 3)
+  {
+    chprintf(chp, "Usage: i2c <addr> <reg> <data>\r\n");
+  }
+  
+  int addr = strtol(argv[0], NULL, 16);
+  int mode = strtol(argv[1], NULL, 16);
+  int reg = strtol(argv[2], NULL, 16);
+  int dat = strtol(argv[3], NULL, 16);
+  
+  static const I2CConfig i2c_cfg = {
+    OPMODE_I2C,
+    50000,
+    STD_DUTY_CYCLE,
+  };
+  
+  i2cStart(&I2CD2, &i2c_cfg);
+  uint8_t txbuf[3] = {mode, reg, dat};
+  msg_t s = i2cMasterTransmitTimeout(&I2CD2, addr, txbuf, 3, NULL, 0, MS2ST(100));
+  i2cStop(&I2CD2);
+  
+  chprintf(chp, "Status: %d\r\n", s);
+}
+
+#include "u8g.h"
+
+uint8_t u8g_com_i2c_chibios_fn(u8g_t *u8g, uint8_t msg, uint8_t arg_val, void *arg_ptr);
+
+// #include "oled.h"
+
+static void cmd_oled(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  u8g_t u8g = {};
+  u8g_InitComFn(&u8g, &u8g_dev_ssd1306_128x64_i2c, u8g_com_i2c_chibios_fn);
+  
+  chThdSleepMilliseconds(50);
+  
+  u8g_FirstPage(&u8g);
+  do {
+    u8g_SetFont(&u8g, u8g_font_courB18);
+    u8g_DrawStr(&u8g, 10, 10, "Hello!");
+    u8g_DrawStr(&u8g, 10, 30, "Hello!");
+  } while (u8g_NextPage(&u8g));
+  
+//   oled_init();
+}
+
 const ShellCommand shell_commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
@@ -256,5 +305,7 @@ const ShellCommand shell_commands[] = {
   {"cat", cmd_cat},
   {"sensors", cmd_sensors},
   {"status", cmd_status},
+  {"i2c", cmd_i2c},
+  {"oled", cmd_oled},
   {NULL, NULL}
 };
