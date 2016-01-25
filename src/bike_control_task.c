@@ -100,15 +100,19 @@ static void bike_control_thread(void *p)
     
     if (!braking)
     {
-      float current = g_acceleration_level * 0.3f * BIKE_MAX_WEIGHT / MOTOR_NEWTON_PER_A;
+      float current = g_acceleration_level * 0.5f * BIKE_MAX_WEIGHT / MOTOR_NEWTON_PER_A;
       int current_mA = (int)(current * 1000.0f) + BIKE_STARTUP_CURRENT_MA;
       
       // Do not apply full torque until motor has spun up.
       // This provides for smooth startup, and also protects fingers ;)
-      int rpm = motor_orientation_get_rpm();
       if (rpm < BIKE_SOFT_START_RPM)
       {
         current_mA = current_mA * rpm / BIKE_SOFT_START_RPM;
+      }
+      
+      if (rpm > 2000)
+      {
+        current_mA += 1000 * (rpm - 2000) / 3000;
       }
       
       // Monitor the wheel acceleration for anti-slip
