@@ -22,7 +22,12 @@
  */
 MEMORY
 {
-    flash : org = 0x08000000, len = 1M
+    /* Bootloader in the first 16 kBytes */
+    boot  : org = 0x08000000, len = 16k
+    /* Main program in flash starting at 0x04000 */
+    flash : org = 0x08004000, len = 128k
+    /* Backup of the main firmware starting at 0x40000 */
+    backup : org = 0x08040000, len = 128k
     ram0  : org = 0x20000000, len = 128k    /* SRAM1 + SRAM2 */
     ram1  : org = 0x20000000, len = 112k    /* SRAM1 */
     ram2  : org = 0x2001C000, len = 16k     /* SRAM2 */
@@ -32,6 +37,14 @@ MEMORY
     ram6  : org = 0x00000000, len = 0
     ram7  : org = 0x00000000, len = 0
 }
+
+/* Information for bootloader */
+__bootloader_start__ = ORIGIN(boot);
+__bootloader_end__   = ORIGIN(boot) + LENGTH(boot);
+__mainprogram_start__ = ORIGIN(flash);
+__mainprogram_end__   = ORIGIN(flash) + LENGTH(flash);
+__backup_start__ = ORIGIN(backup);
+__backup_end__   = ORIGIN(backup) + LENGTH(backup);
 
 /* RAM region to be used for Main stack. This stack accommodates the processing
    of all exceptions and interrupts*/
@@ -47,4 +60,4 @@ REGION_ALIAS("DATA_RAM", ram0);
 /* RAM region to be used for BSS segment.*/
 REGION_ALIAS("BSS_RAM", ram0);
 
-INCLUDE rules.ld
+INCLUDE chrules.ld

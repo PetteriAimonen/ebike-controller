@@ -67,7 +67,7 @@ int main(void)
       start_bike_control();
     }
     
-    enable_trace();
+//     enable_trace();
     
     while (true)
     {

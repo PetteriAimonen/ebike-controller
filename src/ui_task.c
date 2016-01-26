@@ -18,7 +18,7 @@ static void ui_thread(void *p)
   u8g_FirstPage(&u8g);
   do {
     u8g_SetFont(&u8g, u8g_font_8x13);
-    u8g_DrawStr(&u8g, 0, 15, "Owner:");
+    u8g_DrawStr(&u8g, 0, 20, "Owner:");
     u8g_DrawStr(&u8g, 0, 40, "Petteri Aimonen");
     u8g_DrawStr(&u8g, 0, 60, "jpa@kapsi.fi");
   } while (u8g_NextPage(&u8g));

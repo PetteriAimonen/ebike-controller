@@ -9,6 +9,10 @@ UINCDIR += src u8glib
 USE_OPT += -Os -g -gdwarf-2 -g3 -Wno-unused \
         -fomit-frame-pointer -falign-functions=16 -std=gnu99 -ffast-math
 
+# Bootloader
+PROJECT_CSRC += src/bootloader.c
+USE_OPT += -DCORTEX_VTOR_INIT=0x00004000
+
 # Base system & bootup
 PROJECT_CSRC += src/main.c src/board.c src/debug.c
 
@@ -38,7 +42,7 @@ PROJECT_CSRC += u8glib/u8g_line.c u8glib/u8g_page.c
 PROJECT_CSRC += u8glib/u8g_com_i2c_chibios.c u8glib/u8g_dev_ssd1306_128x64.c
 
 UADEFS =
-ULIBDIR = 
+ULIBDIR = src
 ULIBS = -lm
 
 include Makefile.chibios
