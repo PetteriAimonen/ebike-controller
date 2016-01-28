@@ -15,6 +15,7 @@ static uint8_t g_logbuffer2[4096];
 static THD_WORKING_AREA(logsaverstack, 1024);
 static THD_WORKING_AREA(logwriterstack, 1024);
 static thread_t *g_logsaver;
+static int g_fileindex;
 
 #define EVENT_BUF1 1
 #define EVENT_BUF2 2
@@ -39,12 +40,18 @@ static int next_free_filename()
   return max + 1;
 }
 
+int log_get_fileindex()
+{
+  return g_fileindex;
+}
+
 void log_saver_thread(void *p)
 {
   chRegSetThreadName("logsaver");
   
   char filename[16];
-  chsnprintf(filename, sizeof(filename), "%04d.txt", next_free_filename());
+  g_fileindex = next_free_filename();
+  chsnprintf(filename, sizeof(filename), "%04d.txt", g_fileindex);
   
   unsigned bytes_written;
   FIL file;

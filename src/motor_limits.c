@@ -25,7 +25,7 @@ static void apply_limit(int *max_duty, int limitA, int limitB, int value)
     *max_duty = max;
 }
 
-int motor_limits_get_max_duty()
+void motor_limits_update_max_duty()
 {
   int max_duty = PWM_MAX_DUTY;
   
@@ -41,6 +41,9 @@ int motor_limits_get_max_duty()
     g_max_duty_filtered += decay;
   else if (max_duty < (int)g_max_duty_filtered)
     g_max_duty_filtered -= decay;
-  
+}
+
+int motor_limits_get_max_duty()
+{
   return (int)g_max_duty_filtered;
 }

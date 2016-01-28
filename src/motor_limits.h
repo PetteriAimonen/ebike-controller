@@ -4,4 +4,5 @@
 
 #pragma once
 
+void motor_limits_update_max_duty();
 int motor_limits_get_max_duty();

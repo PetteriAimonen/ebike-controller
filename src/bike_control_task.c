@@ -5,6 +5,7 @@
 #include "motor_config.h"
 #include "motor_orientation.h"
 #include "sensor_task.h"
+#include "ui_task.h"
 
 static volatile float g_acceleration_level;
 static volatile float g_motor_current;
@@ -89,18 +90,20 @@ static void bike_control_thread(void *p)
     {
       braking = true;
     }
-    else if (g_acceleration_level > 0.05f)
+    else if (g_acceleration_level > 0.10f)
     {
       braking = false;
     }
-    else if (g_acceleration_level < -0.05f)
+    else if (g_acceleration_level < -0.20f)
     {
       braking = true;
     }
     
+    float assist = ui_get_assist_level() / 100.0f;
+    
     if (!braking)
     {
-      float current = g_acceleration_level * 0.5f * BIKE_MAX_WEIGHT / MOTOR_NEWTON_PER_A;
+      float current = g_acceleration_level * assist * BIKE_MAX_WEIGHT / MOTOR_NEWTON_PER_A;
       int current_mA = (int)(current * 1000.0f) + BIKE_STARTUP_CURRENT_MA;
       
       // Do not apply full torque until motor has spun up.
@@ -112,7 +115,7 @@ static void bike_control_thread(void *p)
       
       if (rpm > 2000)
       {
-        current_mA += 1000 * (rpm - 2000) / 3000;
+        current_mA += assist * 2000 * (rpm - 2000) / 3000;
       }
       
       // Monitor the wheel acceleration for anti-slip

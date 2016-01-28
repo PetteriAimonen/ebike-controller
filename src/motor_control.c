@@ -129,12 +129,12 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
   motor_orientation_update();
   motor_sampling_update();
   motor_sampling_store();
+  motor_limits_update_max_duty();
   
   if ((TIM1->BDTR & TIM_BDTR_MOE) == 0)
   {
     // Brake active, trigger ADC sampling manually
     ADC1->CR2 |= ADC_CR2_JSWSTART;
-    motor_limits_get_max_duty();
   }
   
   if (g_foc_enabled)
