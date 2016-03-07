@@ -186,6 +186,7 @@ void motor_run(int torque_current_mA, int advance_deg)
   g_foc_advance = advance_deg;
   g_foc_enabled = true;
   TIM1->BDTR |= TIM_BDTR_MOE;
+  TIM3->CCR1 = 1;
 }
 
 void motor_stop()
@@ -194,6 +195,7 @@ void motor_stop()
   g_foc_enabled = false;
   TIM1->BDTR &= ~TIM_BDTR_MOE; // Let the motor freewheel
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
+  TIM3->CCR1 = 100; // Disable EN_GATE so that any fault states get resolved..
 }
 
 void start_motor_control()
