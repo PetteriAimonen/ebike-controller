@@ -122,6 +122,15 @@ static void ui_thread(void *p)
       if (g_assist_level > 25)
         g_assist_level -= 25;
     }
+    
+    if (button != prevButton && button != ' ')
+    {
+      // Reinit to recover from any communication failures
+      // Also gives a kind of "ack" flash
+      u8g_InitComFn(&u8g, &u8g_dev_ssd1306_128x64_i2c, u8g_com_i2c_chibios_fn);
+      prevTime = 0;
+    }
+    
     prevButton = button;
   }
 }
