@@ -55,7 +55,7 @@ static void bike_control_thread(void *p)
     
     // Total acceleration along the bike axis
     // Positive = speed increasing
-    float total_accel = z * 0.00981f;
+    float total_accel = z * 0.00981f + 0.3f;
     float decay = 0.01f;
     g_acceleration_level = g_acceleration_level * (1-decay) + total_accel * decay;
     
@@ -94,7 +94,7 @@ static void bike_control_thread(void *p)
     {
       braking = false;
     }
-    else if (g_acceleration_level < -0.20f)
+    else if (g_acceleration_level < -0.50f)
     {
       braking = true;
     }
