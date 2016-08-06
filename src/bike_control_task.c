@@ -29,6 +29,16 @@ int bike_control_get_I_accumulator()
   return (int)(g_control_I_accumulator / MOTOR_NEWTON_PER_A * 1000.0f);
 }
 
+/* State machine:
+ * 
+ * 
+ * IDLE   --brake-----> BRAKING
+ *  ^                 |          ^
+ *  |               no brake   brake
+ *  |                 V          |
+ *   -------stalled----- ACTIVE
+ */
+
 static void bike_control_thread(void *p)
 {
   static event_listener_t el;    
@@ -37,13 +47,13 @@ static void bike_control_thread(void *p)
   chRegSetThreadName("bike_ctrl");
   
   systime_t start = chVTGetSystemTime();
-  bool braking = true;
-  int stallcount = 100;
-  int brakelen = 0;
+  enum { STATE_IDLE, STATE_BRAKING, STATE_ACTIVE } state = STATE_IDLE;
+  int stallcount = 0;
+  
   for (;;)
   {
+    /* Wait for a new reading from sensors */
     chEvtWaitAny(ALL_EVENTS);
-    
     int x, y, z;
     sensors_get_accel(&x, &y, &z);
     
@@ -55,53 +65,38 @@ static void bike_control_thread(void *p)
     
     // Total acceleration along the bike axis
     // Positive = speed increasing
-    float total_accel = z * 0.00981f + 0.3f;
+    float fudge_factor = 0.1f;
+    float total_accel = z * 0.00981f + fudge_factor;
     float decay = 0.01f;
     g_acceleration_level = g_acceleration_level * (1-decay) + total_accel * decay;
     
+    /* Check for braking / stalling conditions */
     int rpm = motor_orientation_get_rpm();
     bool brake = (palReadPad(GPIOB, GPIOB_BRAKE) == 0);
+    bool stall = (rpm < 60 && g_motor_current > 0);
     
-    if (rpm < 60 && g_motor_current > 0)
-    {
+    if (stall)
       stallcount++;
-    }
-    else if (stallcount >= 100)
-    {
-      if (brake)
-      {
-        brakelen++;
-      }
-      else
-      {
-        if (brakelen > 100 && brakelen < 500)
-        {
-          stallcount = 0;
-        }
-        brakelen = 0;
-      }
-    }
     else
-    {
       stallcount = 0;
-    }
     
-    if (brake || stallcount >= 100)
+    /* State change logic */
+    if (brake)
     {
-      braking = true;
+      state = STATE_BRAKING;
     }
-    else if (g_acceleration_level > 0.10f)
+    else if (state == STATE_ACTIVE && stallcount > 50)
     {
-      braking = false;
+      state = STATE_IDLE;
     }
-    else if (g_acceleration_level < -0.50f)
+    else if (state == STATE_BRAKING && !brake)
     {
-      braking = true;
+      state = STATE_ACTIVE;
     }
     
     float assist = ui_get_assist_level() / 100.0f;
     
-    if (!braking)
+    if (state == STATE_ACTIVE && g_acceleration_level > 0)
     {
       float current = g_acceleration_level * assist * BIKE_MAX_WEIGHT / MOTOR_NEWTON_PER_A;
       int current_mA = (int)(current * 1000.0f) + BIKE_STARTUP_CURRENT_MA;

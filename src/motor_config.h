@@ -43,7 +43,7 @@
 #define BIKE_MIN_WEIGHT           20.0f
 #define BIKE_MAX_WEIGHT          100.0f
 #define BIKE_ACCEL_SMOOTH_TIME     2.0f
-#define BIKE_STARTUP_CURRENT_MA 1000
+#define BIKE_STARTUP_CURRENT_MA  500
 #define BIKE_SOFT_START_RPM      600
 #define BIKE_TORQUE_P_TERM         0.1f
 #define BIKE_TORQUE_I_TERM         0.05f
