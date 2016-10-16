@@ -63,13 +63,6 @@ static void bike_control_thread(void *p)
     start = newTime;
     float delta_s = timedelta / (float)(S2ST(1));
     
-    // Total acceleration along the bike axis
-    // Positive = speed increasing
-    float fudge_factor = 0.1f;
-    float total_accel = z * 0.00981f + fudge_factor;
-    float decay = 0.01f;
-    g_acceleration_level = g_acceleration_level * (1-decay) + total_accel * decay;
-    
     /* Check for braking / stalling conditions */
     int rpm = motor_orientation_get_rpm();
     bool brake = (palReadPad(GPIOB, GPIOB_BRAKE) == 0);
@@ -95,6 +88,13 @@ static void bike_control_thread(void *p)
     }
     
     float assist = ui_get_assist_level() / 100.0f;
+    
+    // Total acceleration along the bike axis
+    // Positive = speed increasing
+    float fudge_factor = 0.3f * assist;
+    float total_accel = z * 0.00981f + fudge_factor;
+    float decay = 0.01f;
+    g_acceleration_level = g_acceleration_level * (1-decay) + total_accel * decay;
     
     if (state == STATE_ACTIVE && g_acceleration_level > 0)
     {
