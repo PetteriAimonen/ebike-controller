@@ -22,6 +22,15 @@ int ui_get_assist_level()
   return g_assist_level;
 }
 
+static int g_ok_button_count = 0;
+
+int ui_get_ok_button_clicks()
+{
+  int oldcount = g_ok_button_count;
+  g_ok_button_count = 0;
+  return oldcount;
+}
+
 static void redraw_status()
 {
   char buf[64];
@@ -121,6 +130,10 @@ static void ui_thread(void *p)
     {
       if (g_assist_level > 25)
         g_assist_level -= 25;
+    }
+    else if (button == 'K')
+    {
+      g_ok_button_count++;
     }
     
     if (button != prevButton && button != ' ')
