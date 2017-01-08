@@ -33,10 +33,10 @@
 #define MOTOR_MAX_TEMP_B          70000
 #define MOSFET_MAX_TEMP_A         60000
 #define MOSFET_MAX_TEMP_B         90000
-#define BATTERY_MIN_VOLTAGE_A     34000
-#define BATTERY_MIN_VOLTAGE_B     32000
-#define BATTERY_MAX_CURRENT_A      7000
-#define BATTERY_MAX_CURRENT_B     10000
+#define BATTERY_MIN_VOLTAGE_A     33000
+#define BATTERY_MIN_VOLTAGE_B     30000
+#define BATTERY_MAX_CURRENT_A      8000
+#define BATTERY_MAX_CURRENT_B     11000
 
 // Bike control parameters
 #define MOTOR_NEWTON_PER_A         5.0f
