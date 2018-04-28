@@ -16,7 +16,7 @@ static uint8_t g_logbuffer2[4096];
 static THD_WORKING_AREA(logsaverstack, 1024);
 static THD_WORKING_AREA(logwriterstack, 1024);
 static thread_t *g_logsaver;
-static int g_fileindex;
+static int g_fileindex = -1;
 
 #define EVENT_BUF1 1
 #define EVENT_BUF2 2

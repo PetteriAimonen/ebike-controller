@@ -4,7 +4,17 @@
 
 void u8g_Delay(uint16_t val)
 {
-  chThdSleepMilliseconds(val);
+  if (__get_PRIMASK())
+  {
+    while (val--)
+    {
+      chSysPolledDelayX(168000);
+    }
+  }
+  else
+  {
+    chThdSleepMilliseconds(val);
+  }
 }
 
 void u8g_MicroDelay(void)

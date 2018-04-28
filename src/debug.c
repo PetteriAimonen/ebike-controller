@@ -6,6 +6,7 @@
 #include <string.h>
 #include "board.h"
 #include "usb_usart.h"
+#include "ui_task.h"
 
 static char g_dbgmsg[128];
 
@@ -47,6 +48,8 @@ void abort_with_error(const char *fmt, ...)
     vdbg(fmt, ap);
     va_end(ap);
     
+    ui_show_msg(g_dbgmsg);
+    
     chSysPolledDelayX(168000000);
   }
 }
@@ -63,5 +66,5 @@ void __attribute__((naked)) HardFault_Handler()
     
     stack_pointer = HARDFAULT_PSP;
 
-    abort_with_error("HF %08x", *((uint32_t*)stack_pointer + 6));
+    abort_with_error("HF %08x %08x", *((uint32_t*)stack_pointer + 6), SCB->CFSR);
 }

@@ -148,6 +148,19 @@ static void ui_thread(void *p)
   }
 }
 
+void ui_show_msg(const char *msg)
+{
+  u8g_InitComFn(&u8g, &u8g_dev_ssd1306_128x64_i2c, u8g_com_i2c_chibios_fn);
+  
+  u8g_FirstPage(&u8g);
+  do {
+    u8g_SetFont(&u8g, u8g_font_8x13);
+    u8g_DrawStr(&u8g, 0, 20, "CRASH:");
+    u8g_DrawStr(&u8g, 0, 40, msg);
+    u8g_DrawStr(&u8g, 0, 60, &msg[16]);
+  } while (u8g_NextPage(&u8g));
+}
+
 void ui_start()
 {
   chThdCreateStatic(uistack, sizeof(uistack), NORMALPRIO - 1, ui_thread, NULL);

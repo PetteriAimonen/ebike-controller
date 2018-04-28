@@ -11,6 +11,7 @@
 #include "sensor_task.h"
 #include "bike_control_task.h"
 #include "ui_task.h"
+#include "debug.h"
 
 void enable_trace()
 {
