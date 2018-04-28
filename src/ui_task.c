@@ -52,13 +52,20 @@ static void redraw_status()
     // Total energy used, assist level
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "%3d.%01d Wh  %2d%%",
-               wh / 10, wh % 10, g_assist_level, log_get_fileindex());
+               wh / 10, wh % 10, g_assist_level);
     u8g_DrawStr(&u8g, 5, 40, buf);
     
     // Filename
     u8g_SetFont(&u8g, u8g_font_8x13);
-    chsnprintf(buf, sizeof(buf), "    %04d.txt",
-               log_get_fileindex());
+    int fileindex = log_get_fileindex();
+    if (fileindex >= 0)
+    {
+      chsnprintf(buf, sizeof(buf), "    %04d.txt", fileindex);
+    }
+    else
+    {
+      chsnprintf(buf, sizeof(buf), "  NO MOTOR");
+    }
     u8g_DrawStr(&u8g, 5, 60, buf);
   } while (u8g_NextPage(&u8g));
 }

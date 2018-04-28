@@ -58,8 +58,8 @@ void log_saver_thread(void *p)
   FIL file;
   f_open(&file, filename, FA_WRITE | FA_CREATE_NEW);
   
-  static const char header[] = "# SysTime   BattU    BattI     Tmotor  Tmosfet     RPM     "
-                               "AccX    AccY    AccZ   GyrX    TotAcc  MotorTgt  IAccum   Brake  MaxDuty OKClicks\r\n"
+  static const char header[] = "# SysTime   BattU    BattI    Tmosfet     RPM     "
+                               "AccX    AccY    AccZ   GyrX    TotAcc  MotorTgt  IAccum   Brake  MaxDuty OKClicks Assist\r\n"
                                "#      ms      mV       mA         mC       mC             "
                                "  mg      mg      mg    dps        mg        mA      mA                 \r\n";
   f_write(&file, header, sizeof(header) - 1, &bytes_written);
@@ -103,10 +103,10 @@ void log_writer_thread(void *p)
              "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d\r\n",
              chVTGetSystemTime(),
              get_battery_voltage_mV(), get_battery_current_mA(),
-             get_motor_temperature_mC(), get_mosfet_temperature_mC(),
+             get_mosfet_temperature_mC(),
              motor_orientation_get_rpm(), x, y, z, gx,
              bike_control_get_acceleration_level(), bike_control_get_motor_current(), bike_control_get_I_accumulator(),
-             !palReadPad(GPIOB, GPIOB_BRAKE), motor_limits_get_max_duty(), ui_get_ok_button_clicks()
+             !palReadPad(GPIOB, GPIOB_BRAKE), motor_limits_get_max_duty(), ui_get_ok_button_clicks(), ui_get_assist_level()
               );
     
     char *p = buf;

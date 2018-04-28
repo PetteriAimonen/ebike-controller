@@ -61,6 +61,13 @@ int main(void)
     
     g_have_motor = (motor_orientation_get_hall_sector() >= 0);
     
+    if (!g_have_motor)
+    {
+        // Retry to make sure
+        chThdSleepMilliseconds(100);
+        g_have_motor = (motor_orientation_get_hall_sector() >= 0);
+    }
+    
     if (g_have_motor)
     {
       start_motor_control();
@@ -76,7 +83,5 @@ int main(void)
         chThdSleepMilliseconds(500);
         palSetPad(GPIOC, GPIOC_LED_GREEN);
         chThdSleepMilliseconds(500);
-        
-        check_usb_usart();
     }
 }
