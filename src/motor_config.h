@@ -9,7 +9,7 @@
 
 // PWM period, should be selected so that 168MHz / PWM_FREQ divides nicely.
 #define PWM_MAX  840
-#define PWM_MAX_DUTY 800
+#define PWM_MAX_DUTY 700
 // Shunt resistance
 #define SHUNT_uA_PER_ADC_VAL 16113
 
@@ -33,10 +33,10 @@
 #define MOTOR_MAX_TEMP_B          70000
 #define MOSFET_MAX_TEMP_A         60000
 #define MOSFET_MAX_TEMP_B         90000
-#define BATTERY_MIN_VOLTAGE_A     33000
+#define BATTERY_MIN_VOLTAGE_A     34000
 #define BATTERY_MIN_VOLTAGE_B     30000
-#define BATTERY_MAX_CURRENT_A      8000
-#define BATTERY_MAX_CURRENT_B     11000
+#define BATTERY_MAX_CURRENT_A      6000
+#define BATTERY_MAX_CURRENT_B      8000
 
 // Bike control parameters
 #define MOTOR_NEWTON_PER_A         5.0f
