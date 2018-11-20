@@ -12,6 +12,9 @@ void motor_sampling_init();
 // Updates value estimates, called by motor_control.
 void motor_sampling_update();
 
+// Updates just battery voltage, called by main.c when no motor connected
+void motor_sampling_update_voltage();
+
 // Stores current values into debug ringbuffer, called by motor_control.
 void motor_sampling_store();
 

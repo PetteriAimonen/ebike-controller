@@ -2,6 +2,7 @@
 #include "motor_config.h"
 #include "motor_sampling.h"
 #include "motor_orientation.h"
+#include "log_task.h"
 
 static float g_max_duty_filtered = PWM_MAX_DUTY;
 
@@ -32,8 +33,8 @@ void motor_limits_update_max_duty()
   apply_limit(&max_duty, MOTOR_MAX_RPM_A, MOTOR_MAX_RPM_B, motor_orientation_get_rpm());
 //   apply_limit(&max_duty, MOTOR_MAX_TEMP_A, MOTOR_MAX_TEMP_B, get_motor_temperature_mC());
   apply_limit(&max_duty, MOSFET_MAX_TEMP_A, MOSFET_MAX_TEMP_B, get_mosfet_temperature_mC());
-  apply_limit(&max_duty, -BATTERY_MIN_VOLTAGE_A, -BATTERY_MIN_VOLTAGE_B, -get_battery_voltage_mV());
-  apply_limit(&max_duty, BATTERY_MAX_CURRENT_A, BATTERY_MAX_CURRENT_B, get_battery_current_mA());
+  apply_limit(&max_duty, -g_system_state.min_voltage_V * 1000, -(g_system_state.min_voltage_V - 3) * 1000, -get_battery_voltage_mV());
+  apply_limit(&max_duty, g_system_state.max_battery_current_A * 1000, (g_system_state.max_battery_current_A + 2) * 1000, get_battery_current_mA());
   
   float decay = (float)PWM_MAX_DUTY / (CONTROL_FREQ * DUTY_LIMIT_FILTER_S);
   

@@ -8,19 +8,22 @@
 #include "wheel_speed.h"
 #include "sensor_task.h"
 #include "ui_task.h"
+#include "log_task.h"
 
 static THD_WORKING_AREA(bikestack, 1024);
 
 /* State machine:
  * 
- * BOOT -----> MOVING -----> BRAKING -----> POWERED
- *                 ^-----------' ^------------|
- *                 ^--------------------------'
+ *  v----------------------------.
+ * BOOT -----> BRAKING -----> WAITMOVE ------> POWERED
+ *                ^-------------------------------'
  */
 
-static enum { STATE_BOOT = 0, STATE_MOVING, STATE_BRAKING, STATE_POWERED } g_bike_state;
+static enum { STATE_BOOT = 0, STATE_BRAKING, STATE_WAITMOVE, STATE_POWERED } g_bike_state;
 static float g_acceleration; // In m/s^2 along bike axis
 static float g_motor_current;
+static systime_t g_brake_time;
+static int g_brake_pos;
 
 const char* bike_control_get_state()
 {
@@ -33,32 +36,17 @@ int bike_control_get_acceleration()
   return 1000 * g_acceleration;
 }
 
+int bike_control_get_acceleration_mg()
+{
+  return (1000.0f/9.81f) * g_acceleration;
+}
+
 int bike_control_get_motor_current()
 {
   return 1000 * g_motor_current;
 }
 
 static void state_boot()
-{
-  static int tickcount_stopped;
-  
-  g_motor_current = 0.0f;
-  
-  if (wheel_speed_get_velocity() > BIKE_MIN_VELOCITY)
-  {
-    if (wheel_speed_get_tickcount() > tickcount_stopped + 2)
-    {
-      // Wheel moved by atleast two ticks.
-      g_bike_state = STATE_MOVING;
-    }
-  }
-  else
-  {
-    tickcount_stopped = wheel_speed_get_tickcount();
-  }
-}
-
-static void state_moving()
 {
   g_motor_current = 0.0f;
   
@@ -74,14 +62,21 @@ static void state_braking()
   
   if (palReadPad(GPIOB, GPIOB_BRAKE) != 0)
   {
-    if (wheel_speed_get_velocity() > BIKE_MIN_VELOCITY)
-    {
-      g_bike_state = STATE_POWERED;
-    }
-    else
-    {
-      g_bike_state = STATE_MOVING;
-    }
+    g_bike_state = STATE_WAITMOVE;
+    g_brake_time = chVTGetSystemTime();
+    g_brake_pos = wheel_speed_get_tickcount();
+  }
+}
+
+static void state_waitmove()
+{
+  if (wheel_speed_get_tickcount() - g_brake_pos >= 2)
+  {
+    g_bike_state = STATE_POWERED;
+  }
+  else if (chVTGetSystemTime() - g_brake_time > S2ST(2))
+  {
+    g_bike_state = STATE_BOOT;
   }
 }
 
@@ -147,7 +142,7 @@ static void state_powered()
   {
     // Wheel is stopped
     g_motor_current = 0.0f;
-    g_bike_state = STATE_MOVING;
+    g_bike_state = STATE_BOOT;
   }
   else if (min_accel < -BIKE_BRAKE_THRESHOLD_B_M_S2 || wheel_accel < -BIKE_BRAKE_THRESHOLD_M_S2)
   {
@@ -166,7 +161,9 @@ static void state_powered()
     
     float target_current = (pedal_accel * assist_flat + hill_accel * assist_hill) * BIKE_WEIGHT_KG / MOTOR_NEWTON_PER_A;
     if (target_current < BIKE_MIN_CURRENT_A) target_current = 0;
-    if (target_current > MAX_MOTOR_CURRENT/1000.0f) target_current = MAX_MOTOR_CURRENT/1000.0f;
+
+    int max_current = g_system_state.max_motor_current_A;
+    if (target_current > max_current) target_current = max_current;
     
     float decay = delta_s / BIKE_TORQUE_FILTER_S;
     
@@ -204,21 +201,28 @@ static void bike_control_thread(void *p)
     int x, y, z;
     sensors_get_accel(&x, &y, &z);
     
+    z -= g_system_state.accelerometer_bias_mg;
+
     float acceleration = z * 0.00981f;
     float decay = 1.0f / 5;
     g_acceleration = acceleration * decay + g_acceleration * (1 - decay);
     
+    if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
+    {
+      g_bike_state = STATE_BRAKING;
+    }
+
     if (g_bike_state == STATE_BOOT)
     {
       state_boot();
     }
-    else if (g_bike_state == STATE_MOVING)
-    {
-      state_moving();
-    }
     else if (g_bike_state == STATE_BRAKING)
     {
       state_braking();
+    }
+    else if (g_bike_state == STATE_WAITMOVE)
+    {
+      state_waitmove();
     }
     else if (g_bike_state == STATE_POWERED)
     {

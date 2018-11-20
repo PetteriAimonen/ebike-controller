@@ -109,6 +109,15 @@ static float ntc_to_millicelsius(float ohms_25C, float beta, float adc_ohms)
   return 1000.0f * (T - 273.15f);
 }
 
+void motor_sampling_update_voltage()
+{
+  /* Estimate battery voltage */
+  float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
+  g_battery_voltage = mV;
+
+  ADC1->CR2 |= ADC_CR2_JSWSTART;
+}
+
 void motor_sampling_update()
 {
   float decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);

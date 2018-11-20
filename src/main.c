@@ -7,6 +7,7 @@
 #include "filesystem.h"
 #include "motor_control.h"
 #include "motor_orientation.h"
+#include "motor_sampling.h"
 #include "log_task.h"
 #include "sensor_task.h"
 #include "bike_control_task.h"
@@ -68,17 +69,28 @@ int main(void)
         g_have_motor = (motor_orientation_get_hall_sector() >= 0);
     }
     
+    load_system_state();
+
     if (g_have_motor)
     {
       start_motor_control();
       start_log();
       start_bike_control();
     }
+    else
+    {
+      motor_sampling_init(); // For battery voltage
+    }
     
 //     enable_trace();
     
     while (true)
     {
+        if (!g_have_motor)
+        {
+          motor_sampling_update_voltage();
+        }
+
         palClearPad(GPIOC, GPIOC_LED_GREEN);
         chThdSleepMilliseconds(500);
         palSetPad(GPIOC, GPIOC_LED_GREEN);
