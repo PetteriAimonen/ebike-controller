@@ -14,6 +14,7 @@
 #include "sensor_task.h"
 #include "bike_control_task.h"
 #include "motor_limits.h"
+#include "wheel_speed.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -234,10 +235,11 @@ static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
 {
   chprintf(chp, "Battery voltage:      %8d mV\r\n", get_battery_voltage_mV());
   chprintf(chp, "Battery current:      %8d mA\r\n", get_battery_current_mA());
-  chprintf(chp, "Motor temperature:    %8d mC\r\n", get_motor_temperature_mC());
   chprintf(chp, "Mosfet temperature:   %8d mC\r\n", get_mosfet_temperature_mC());
   chprintf(chp, "Motor RPM:            %8d\r\n",    motor_orientation_get_rpm());
-  chprintf(chp, "Acceleration level:   %8d mg\r\n", bike_control_get_acceleration_level());
+  chprintf(chp, "Wheel velocity:       %8d m/s\r\n", (int)wheel_speed_get_velocity());
+  chprintf(chp, "Wheel distance:       %8d m\r\n",  wheel_speed_get_distance());
+  chprintf(chp, "Acceleration:         %8d mg\r\n", bike_control_get_acceleration());
   chprintf(chp, "Motor target current: %8d mA\r\n", bike_control_get_motor_current());
   chprintf(chp, "Motor max duty:       %8d\r\n",    motor_limits_get_max_duty());
 }

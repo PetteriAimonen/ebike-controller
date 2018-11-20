@@ -24,6 +24,9 @@
 #define FOC_P_TERM 0.5f
 #define FOC_I_TERM 0.05f
 
+// Distance in meters per one wheel speed sensor tick.
+#define WHEEL_SPEED_STEP (2.17f/6)
+
 // Maximum motor speed, temperatures and minimum battery voltage
 // For each, A point gives the start of the linear duty lowering,
 // and B point is where the duty drops to 0%.
@@ -40,10 +43,11 @@
 
 // Bike control parameters
 #define MOTOR_NEWTON_PER_A         5.0f
-#define BIKE_MIN_WEIGHT           20.0f
-#define BIKE_MAX_WEIGHT          100.0f
-#define BIKE_ACCEL_SMOOTH_TIME     2.0f
-#define BIKE_STARTUP_CURRENT_MA  500
-#define BIKE_SOFT_START_RPM      600
-#define BIKE_TORQUE_P_TERM         0.1f
-#define BIKE_TORQUE_I_TERM         0.05f
+#define BIKE_WEIGHT_KG            90.0f
+#define BIKE_MIN_VELOCITY          0.2f
+#define BIKE_MIN_PEDAL_INTERVAL_S    2
+#define BIKE_BRAKE_THRESHOLD_M_S2  1.0f
+#define BIKE_BRAKE_THRESHOLD_B_M_S2  5.0f
+#define BIKE_TORQUE_FILTER_S       0.5f
+#define BIKE_MIN_CURRENT_A         0.2f
+#define BIKE_SOFTSTART_A           0.5f

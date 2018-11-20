@@ -9,6 +9,7 @@
 #include "motor_orientation.h"
 #include "motor_sampling.h"
 #include "motor_limits.h"
+#include "wheel_speed.h"
 
 // Some useful constants
 static const float f_pi = 3.14159265f;
@@ -126,6 +127,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
 {
   TIM1->SR &= ~TIM_SR_UIF;
   
+  wheel_speed_update();
   motor_orientation_update();
   motor_sampling_update();
   motor_sampling_store();

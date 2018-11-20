@@ -169,7 +169,7 @@ int get_battery_voltage_mV()
 
 int get_motor_temperature_mC()
 {
-  return (int)g_motor_temperature;
+  return 20000;
 }
 
 int get_mosfet_temperature_mC()

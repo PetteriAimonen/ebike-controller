@@ -7,8 +7,8 @@ Includes=\x00\x00\x00\x00
 Path=.
 
 [Defines And Includes][Compiler]
-Name=arm-none-eabi-gcc
-Path=arm-none-eabi-gcc
+Name=arm gcc
+Path=/home/petteri/bin/arm-none-eabi-gcc
 Type=GCC
 
 [Filters]

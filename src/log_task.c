@@ -9,6 +9,7 @@
 #include "motor_orientation.h"
 #include "motor_limits.h"
 #include "sensor_task.h"
+#include "wheel_speed.h"
 #include "bike_control_task.h"
 
 static uint8_t g_logbuffer1[4096];
@@ -58,10 +59,10 @@ void log_saver_thread(void *p)
   FIL file;
   f_open(&file, filename, FA_WRITE | FA_CREATE_NEW);
   
-  static const char header[] = "# SysTime   BattU    BattI    Tmosfet     RPM     "
-                               "AccX    AccY    AccZ   GyrX    TotAcc  MotorTgt  IAccum   Brake  MaxDuty OKClicks Assist\r\n"
-                               "#      ms      mV       mA         mC       mC             "
-                               "  mg      mg      mg    dps        mg        mA      mA                 \r\n";
+  static const char header[] = "# SysTime    Dist.     Vel.    WAcc.    BattU    BattI    Tmosfet     RPM     Duty"
+                               "   Accel  Current    State   Clicks\r\n"
+                               "#      ms       m      mm/s   mm^2/s       mV       mA         mC     rpm      pwm"
+                               "   mm/s^2        mA       \r\n";
   f_write(&file, header, sizeof(header) - 1, &bytes_written);
   
   for (;;)
@@ -94,20 +95,15 @@ void log_writer_thread(void *p)
   {
     chThdSleepMilliseconds(50);
     
-    int x, y, z, gx, gy, gz;
-    sensors_get_accel(&x, &y, &z);
-    sensors_get_gyro(&gx, &gy, &gz);
-    
     static char buf[512];
     chsnprintf(buf, sizeof(buf),
-             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d\r\n",
+             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d\r\n",
              chVTGetSystemTime(),
+             wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
              get_battery_voltage_mV(), get_battery_current_mA(),
-             get_mosfet_temperature_mC(),
-             motor_orientation_get_rpm(), x, y, z, gx,
-             bike_control_get_acceleration_level(), bike_control_get_motor_current(), bike_control_get_I_accumulator(),
-             !palReadPad(GPIOB, GPIOB_BRAKE), motor_limits_get_max_duty(), ui_get_ok_button_clicks(), ui_get_assist_level()
-              );
+             get_mosfet_temperature_mC(), motor_orientation_get_rpm(), motor_limits_get_max_duty(),
+             bike_control_get_acceleration(), bike_control_get_motor_current(),
+             bike_control_get_state(), ui_get_ok_button_clicks());
     
     char *p = buf;
     while (*p)
