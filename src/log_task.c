@@ -147,7 +147,7 @@ void log_writer_thread(void *p)
     systime_t delta_t = chVTGetSystemTime() - prev_time;
     g_system_state.total_time_ms = ST2MS(delta_t);
     prev_time += delta_t;
-    g_system_state.total_energy_mJ += (get_battery_voltage_mV() * get_battery_current_mA() * ST2MS(delta_t) + 500000) / 1000000;
+    g_system_state.total_energy_mJ += (get_battery_voltage_mV() * get_battery_current_mA() / 1000 * ST2MS(delta_t) + 500) / 1000;
   }
 }
 
