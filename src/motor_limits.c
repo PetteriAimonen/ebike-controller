@@ -46,5 +46,6 @@ void motor_limits_update_max_duty()
 
 int motor_limits_get_max_duty()
 {
-  return (int)g_max_duty_filtered;
+  return 500;
+  //return (int)g_max_duty_filtered;
 }

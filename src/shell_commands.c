@@ -11,10 +11,10 @@
 #include "motor_orientation.h"
 #include "motor_sampling.h"
 #include <ff.h>
-#include "sensor_task.h"
-#include "bike_control_task.h"
 #include "motor_limits.h"
 #include "wheel_speed.h"
+#include "tlv493.h"
+#include "cart_control_task.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -219,12 +219,13 @@ static void cmd_cat(BaseSequentialStream *chp, int argc, char *argv[])
 
 static void cmd_sensors(BaseSequentialStream *chp, int argc, char *argv[])
 {
+  tlv493_init();
+
   int b = 0;
   do {
-    int x, y, z, gx, gy, gz;
-    sensors_get_accel(&x, &y, &z);
-    sensors_get_gyro(&gx, &gy, &gz);
-    chprintf(chp, "ACC: %8d %8d %8d    GYRO: %8d %8d %8d\r\n", x, y, z, gx, gy, gz);
+    int x, y, z;
+    tlv493_read(&x, &y, &z);
+    chprintf(chp, "MAG: %8d %8d %8d\r\n", x, y, z);
     
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));
@@ -239,9 +240,8 @@ static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "Motor RPM:            %8d\r\n",    motor_orientation_get_rpm());
   chprintf(chp, "Wheel velocity:       %8d m/s\r\n", (int)wheel_speed_get_velocity());
   chprintf(chp, "Wheel distance:       %8d m\r\n",  wheel_speed_get_distance());
-  chprintf(chp, "Acceleration:         %8d mg\r\n", bike_control_get_acceleration());
-  chprintf(chp, "Motor target current: %8d mA\r\n", bike_control_get_motor_current());
   chprintf(chp, "Motor max duty:       %8d\r\n",    motor_limits_get_max_duty());
+  chprintf(chp, "Target current:       %8d mA\r\n",    (int)(1000*cart_control_get_current()));
 }
 
 static void cmd_i2c(BaseSequentialStream *chp, int argc, char *argv[])
@@ -270,29 +270,6 @@ static void cmd_i2c(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "Status: %d\r\n", s);
 }
 
-#include "u8g.h"
-
-uint8_t u8g_com_i2c_chibios_fn(u8g_t *u8g, uint8_t msg, uint8_t arg_val, void *arg_ptr);
-
-// #include "oled.h"
-
-static void cmd_oled(BaseSequentialStream *chp, int argc, char *argv[])
-{
-  u8g_t u8g = {};
-  u8g_InitComFn(&u8g, &u8g_dev_ssd1306_128x64_i2c, u8g_com_i2c_chibios_fn);
-  
-  chThdSleepMilliseconds(50);
-  
-  u8g_FirstPage(&u8g);
-  do {
-    u8g_SetFont(&u8g, u8g_font_courB18);
-    u8g_DrawStr(&u8g, 10, 10, "Hello!");
-    u8g_DrawStr(&u8g, 10, 30, "Hello!");
-  } while (u8g_NextPage(&u8g));
-  
-//   oled_init();
-}
-
 const ShellCommand shell_commands[] = {
   {"mem", cmd_mem},
   {"threads", cmd_threads},
@@ -308,6 +285,5 @@ const ShellCommand shell_commands[] = {
   {"sensors", cmd_sensors},
   {"status", cmd_status},
   {"i2c", cmd_i2c},
-  {"oled", cmd_oled},
   {NULL, NULL}
 };

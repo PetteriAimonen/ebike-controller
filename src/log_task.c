@@ -10,7 +10,6 @@
 #include "motor_limits.h"
 #include "sensor_task.h"
 #include "wheel_speed.h"
-#include "bike_control_task.h"
 
 volatile system_state_t g_system_state = {
   .accelerometer_bias_mg = 0,
@@ -115,13 +114,11 @@ void log_writer_thread(void *p)
     
     static char buf[512];
     chsnprintf(buf, sizeof(buf),
-             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d\r\n",
+             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d\r\n",
              chVTGetSystemTime(),
              wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
              get_battery_voltage_mV(), get_battery_current_mA(),
-             get_mosfet_temperature_mC(), motor_orientation_get_rpm(), motor_limits_get_max_duty(),
-             bike_control_get_acceleration(), bike_control_get_motor_current(),
-             bike_control_get_state(), ui_get_ok_button_clicks());
+             get_mosfet_temperature_mC(), motor_orientation_get_rpm(), motor_limits_get_max_duty());
     
     char *p = buf;
     while (*p)
@@ -145,9 +142,9 @@ void log_writer_thread(void *p)
     g_system_state.total_distance_m += delta_d;
     prev_distance += delta_d;
     systime_t delta_t = chVTGetSystemTime() - prev_time;
-    g_system_state.total_time_ms = ST2MS(delta_t);
+    g_system_state.total_time_ms += ST2MS(delta_t);
     prev_time += delta_t;
-    g_system_state.total_energy_mJ += (get_battery_voltage_mV() * get_battery_current_mA() / 1000 * ST2MS(delta_t) + 500) / 1000;
+    g_system_state.total_energy_mJ += (get_battery_voltage_mV() * get_battery_current_mA() / 1000 * (int)(ST2MS(delta_t)) + 500) / 1000;
   }
 }
 

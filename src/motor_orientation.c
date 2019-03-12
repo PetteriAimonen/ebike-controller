@@ -64,7 +64,7 @@ void motor_orientation_update()
   int hall_angle = 360 - sector * 60 + 30;
   hall_angle = (hall_angle + HALL_OFFSET + 360) % 360;
   
-  if (abs(angle_diff(hall_angle, g_motor_angle)) > 60)
+  if (abs(angle_diff(hall_angle, g_motor_angle)) > 90)
   {
     // Lost sync with the motor rotation
     g_motor_lockcount = 0;
@@ -73,18 +73,18 @@ void motor_orientation_update()
   }
   
   int delta = angle_diff(hall_angle, g_hall_prev_angle);
-  if (delta > 0)
+  if (delta != 0)
   {
     // Moved from one sector to the next, current angle is
     // quite accurately in between the two.
-    int angle_now = hall_angle - 30;
+    int angle_now = hall_angle - delta / 2;
     
-    if (g_motor_rpm <= 0)
+    if (g_motor_rpm == 0)
     {
       // Setup the velocity based on time between sectors.
       // sectors_per_s = CONTROL_FREQ / g_hall_time_since_change
-      // rpm = sectors_per_s * 60 / 6
-      g_motor_rpm = 10 * CONTROL_FREQ / g_hall_time_since_change;
+      // rpm = deg_per_s * 60/360
+      g_motor_rpm = delta * CONTROL_FREQ / (6 * g_hall_time_since_change);
       g_motor_rpm_adj_P = 0;
       g_motor_angle = angle_now;
     }
@@ -97,19 +97,13 @@ void motor_orientation_update()
       
       // Fine-tune the velocity estimate.
       int delta = angle_diff(angle_now, g_motor_angle);
-      int rpm_delta = delta * CONTROL_FREQ / (g_hall_time_since_change * 6);
+      int rpm_delta = delta * CONTROL_FREQ / (6 * g_hall_time_since_change);
       g_motor_rpm_adj_P = rpm_delta;
       g_motor_rpm += rpm_delta / 12;
     }
     
     g_hall_time_since_change = 0;
     g_hall_prev_angle = hall_angle;
-  }
-  else if (delta < 0)
-  {
-    // Rotating backwards..
-    g_motor_rpm = 0;
-    g_motor_lockcount = 0;
   }
   else
   {
@@ -125,6 +119,7 @@ void motor_orientation_update()
   const int acc_per_degree = CONTROL_FREQ * 60 / 360;
   int degs = accumulator / acc_per_degree;
   int new_angle = g_motor_angle + degs;
+  if (new_angle < 0) new_angle += 360;
   if (new_angle >= 360) new_angle -= 360;
   g_motor_angle = new_angle;
   accumulator -= degs * acc_per_degree;
@@ -136,14 +131,14 @@ void motor_orientation_update()
 
 int motor_orientation_get_angle()
 {
-  if (g_motor_lockcount > LOCK_THRESHOLD)
+//   if (g_motor_lockcount > LOCK_THRESHOLD)
   {
     return g_motor_angle;
   }
-  else
-  {
-    return g_hall_prev_angle;
-  }
+//   else
+//   {
+//     return g_hall_prev_angle;
+//   }
 }
 
 int motor_orientation_get_hall_angle()

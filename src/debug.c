@@ -48,8 +48,6 @@ void abort_with_error(const char *fmt, ...)
     vdbg(fmt, ap);
     va_end(ap);
     
-    ui_show_msg(g_dbgmsg);
-    
     chSysPolledDelayX(168000000);
   }
 }

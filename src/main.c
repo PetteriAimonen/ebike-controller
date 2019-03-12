@@ -10,7 +10,7 @@
 #include "motor_sampling.h"
 #include "log_task.h"
 #include "sensor_task.h"
-#include "bike_control_task.h"
+#include "cart_control_task.h"
 #include "ui_task.h"
 #include "debug.h"
 
@@ -57,40 +57,19 @@ int main(void)
     start_bluetooth_shell();
     
     filesystem_init();
-    sensors_start();
-    ui_start();
+    // sensors_start();
+    // ui_start();
     
-    g_have_motor = (motor_orientation_get_hall_sector() >= 0);
-    
-    if (!g_have_motor)
-    {
-        // Retry to make sure
-        chThdSleepMilliseconds(100);
-        g_have_motor = (motor_orientation_get_hall_sector() >= 0);
-    }
-    
-    load_system_state();
+    g_have_motor = true;
 
-    if (g_have_motor)
-    {
-      start_motor_control();
-      start_log();
-      start_bike_control();
-    }
-    else
-    {
-      motor_sampling_init(); // For battery voltage
-    }
+    start_motor_control();
+    start_log();
+    start_cart_control();
     
 //     enable_trace();
     
     while (true)
     {
-        if (!g_have_motor)
-        {
-          motor_sampling_update_voltage();
-        }
-
         palClearPad(GPIOC, GPIOC_LED_GREEN);
         chThdSleepMilliseconds(500);
         palSetPad(GPIOC, GPIOC_LED_GREEN);
