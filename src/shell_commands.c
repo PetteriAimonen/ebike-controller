@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "board.h"
 #include "shell_commands.h"
 #include "motor_control.h"
@@ -224,8 +225,16 @@ static void cmd_sensors(BaseSequentialStream *chp, int argc, char *argv[])
   int b = 0;
   do {
     int x, y, z;
-    tlv493_read(&x, &y, &z);
-    chprintf(chp, "MAG: %8d %8d %8d\r\n", x, y, z);
+    if (tlv493_read(&x, &y, &z))
+    {
+        int a = -180.0f / 3.1415f * atan2f(y, x);
+        if (x*x+y*y < 256) a = 0;
+        chprintf(chp, "MAG: X: %8d Y: %8d Z: %8d A: %8d\r\n", x, y, z, a);
+    }
+    else
+    {
+        chprintf(chp, "MAG: Read failed\r\n");
+    }
     
     // End if enter is pressed
     b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));

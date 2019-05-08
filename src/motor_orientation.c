@@ -131,14 +131,14 @@ void motor_orientation_update()
 
 int motor_orientation_get_angle()
 {
-//   if (g_motor_lockcount > LOCK_THRESHOLD)
+  if (g_motor_lockcount > LOCK_THRESHOLD)
   {
     return g_motor_angle;
   }
-//   else
-//   {
-//     return g_hall_prev_angle;
-//   }
+  else
+  {
+    return g_hall_prev_angle;
+  }
 }
 
 int motor_orientation_get_hall_angle()

@@ -26,7 +26,7 @@ static void cart_control_thread(void *p)
 
   for (;;)
   {
-    chThdSleepMilliseconds(20);
+    chThdSleepMilliseconds(50);
     int x, y, z;
     if (!tlv493_read(&x, &y, &z))
     {
@@ -34,51 +34,99 @@ static void cart_control_thread(void *p)
       continue;
     }
     
-    float control_value = z / 2048.0f; // -1 to +1
+    float angle = -180.0f / 3.1415f * atan2f(y, x);
+    if (angle < -90.0f) angle = -90.0f;
+    if (angle > 90.0f) angle = 90.0f;
 
-    if (fabsf(control_value) < fabsf(g_control_value_avg) * 0.5f)
+    if (x*x + y*y < 256)
     {
-      // Fast braking
-      g_control_value_avg = control_value;
+        angle = 45.0f;
+        dbg("Angle sensor error\n");
+    }
+
+    float max_current = 5.0f; // Amperes
+    float speed = motor_orientation_get_rpm() * 0.0016f; // Meters per second
+    float sign = (speed > 0) ? 1 : -1;
+    float absspeed = speed * sign;
+
+    float angle_factor = fabsf(angle) / 90.0f;
+    float speed_factor = (absspeed > 1.0f) ? 1.0f : (absspeed < 0.1f) ? 0 : absspeed;
+    float torque_current = 0.0f;
+
+    if (angle < -20.0f)
+    {
+        // Braking, torque in opposite of spinning direction
+        torque_current = -sign * max_current * angle_factor * speed_factor;
+    }
+    else if (angle > 20.0f)
+    {
+        // Assist in the same direction the motor is spinning
+        torque_current = sign * max_current * angle_factor * speed_factor;
+    }
+
+    if (fabsf(torque_current) > 0.1f)
+    {
+        palSetPad(GPIOC, GPIOC_EXT3);
+        motor_run(torque_current * 1000, 0);
     }
     else
     {
-      float decay = 0.2f;
-      g_control_value_avg = control_value * decay + g_control_value_avg * (1 - decay);
+        if (chVTGetSystemTime() % MS2ST(2000) < MS2ST(500))
+        {
+            palSetPad(GPIOC, GPIOC_EXT3);
+        }
+        else
+        {
+            palClearPad(GPIOC, GPIOC_EXT3);
+        }
+        motor_stop();
     }
 
-    if (fabsf(g_control_value_avg) < 0.1f)
-    {
-      g_motor_current = 0.0f;
-      motor_stop();
-    }
-    else
-    {
-      // The control value comes from throttle handle.
-      // It controls both motor torque and the max allowed RPM.
-      // If max RPM is exceeded by external force (going downhill), the motor
-      // will brake.
-      float max_rpm = 100 * 100.0f * control_value; // Max RPM = 100 and gearing x100
-      float max_current = 10.0f * control_value;
-      float current_rpm = motor_orientation_get_rpm();
-      float sign = (control_value > 0) ? 1 : -1;
-
-      if (sign * current_rpm > sign * max_rpm * 0.9f && sign * g_motor_current < sign * max_current)
-      {
-        // Velocity control mode, adjust current to limit RPM
-        float error = current_rpm - max_rpm;
-        float adjustment = -error * max_current / max_rpm;
-        dbg("error %5d, adj %5d, cur %5d, rpm %5d, tgt %5d", (int)(error), (int)(adjustment * 1000), (int)(g_motor_current * 1000), (int)current_rpm, (int)max_rpm);
-        g_motor_current += adjustment * 0.01f;
-        motor_run((g_motor_current + adjustment) * 1000, 0);
-      }
-      else
-      {
-        float decay = 0.2f;
-        g_motor_current = decay * max_current + (1 - decay) * g_motor_current;
-        motor_run(g_motor_current * 1000, 0);
-      }
-    }
+//     float control_value = z / 2048.0f; // -1 to +1
+//
+//     if (fabsf(control_value) < fabsf(g_control_value_avg) * 0.5f)
+//     {
+//       // Fast braking
+//       g_control_value_avg = control_value;
+//     }
+//     else
+//     {
+//       float decay = 0.2f;
+//       g_control_value_avg = control_value * decay + g_control_value_avg * (1 - decay);
+//     }
+//
+//     if (fabsf(g_control_value_avg) < 0.1f)
+//     {
+//       g_motor_current = 0.0f;
+//       motor_stop();
+//     }
+//     else
+//     {
+//       // The control value comes from throttle handle.
+//       // It controls both motor torque and the max allowed RPM.
+//       // If max RPM is exceeded by external force (going downhill), the motor
+//       // will brake.
+//       float max_rpm = 100 * 100.0f * control_value; // Max RPM = 100 and gearing x100
+//       float max_current = 10.0f * control_value;
+//       float current_rpm = motor_orientation_get_rpm();
+//       float sign = (control_value > 0) ? 1 : -1;
+//
+//       if (sign * current_rpm > sign * max_rpm * 0.9f && sign * g_motor_current < sign * max_current)
+//       {
+//         // Velocity control mode, adjust current to limit RPM
+//         float error = current_rpm - max_rpm;
+//         float adjustment = -error * max_current / max_rpm;
+//         dbg("error %5d, adj %5d, cur %5d, rpm %5d, tgt %5d", (int)(error), (int)(adjustment * 1000), (int)(g_motor_current * 1000), (int)current_rpm, (int)max_rpm);
+//         g_motor_current += adjustment * 0.01f;
+//         motor_run((g_motor_current + adjustment) * 1000, 0);
+//       }
+//       else
+//       {
+//         float decay = 0.2f;
+//         g_motor_current = decay * max_current + (1 - decay) * g_motor_current;
+//         motor_run(g_motor_current * 1000, 0);
+//       }
+//     }
   }
 }
 

@@ -8,7 +8,6 @@
 #include "motor_sampling.h"
 #include "motor_orientation.h"
 #include "motor_limits.h"
-#include "sensor_task.h"
 #include "wheel_speed.h"
 
 volatile system_state_t g_system_state = {

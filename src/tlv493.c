@@ -7,8 +7,8 @@
 
 static const I2CConfig i2c_cfg = {
   OPMODE_I2C,
-  100000,
-  FAST_DUTY_CYCLE_2,
+  50000,
+  STD_DUTY_CYCLE,
 };
 
 #define I2C_ADDR        0x5E
@@ -17,6 +17,16 @@ void tlv493_init()
 {
   uint8_t resetcmd[1] = {0xFF};
   uint8_t rxbuf[10] = {0};
+
+  palSetPadMode(GPIOB, GPIOB_I2C_SCL, PAL_MODE_OUTPUT_OPENDRAIN);
+  for (int i = 0; i < 16; i++)
+  {
+      palSetPad(GPIOB, GPIOB_I2C_SCL);
+      chThdSleepMilliseconds(1);
+      palClearPad(GPIOB, GPIOB_I2C_SCL);
+      chThdSleepMilliseconds(1);
+  }
+  palSetPadMode(GPIOB, GPIOB_I2C_SCL, PAL_MODE_ALTERNATE(4));
 
   i2cStart(&I2CD2, &i2c_cfg);
   i2cMasterTransmitTimeout(&I2CD2, 0x00, resetcmd, 1, NULL, 0, MS2ST(100));
@@ -29,7 +39,7 @@ void tlv493_init()
   txbuf[1] |= 1; // Low power mode enable
   txbuf[1] |= rxbuf[7] & 0x18; // Reserved bits
   txbuf[2] = rxbuf[8]; // Reserved bits
-  txbuf[3] |= 0x40; // 100 Hz mode
+  txbuf[3] |= 0x00; // 10 Hz mode
   txbuf[3] |= rxbuf[9] & 0x1F; // Reserved bits
 
   int parity = __builtin_popcount(txbuf[0] ^ txbuf[1] ^ txbuf[2] ^ txbuf[3]) & 1;
@@ -47,11 +57,11 @@ bool tlv493_read(int *x, int *y, int *z)
   bool valid = false;
 
   i2cStart(&I2CD2, &i2c_cfg);
-  int maxtries = 5;
+  int maxtries = 10;
   do {
-    i2cMasterReceiveTimeout(&I2CD2, I2C_ADDR, rxbuf, 6, MS2ST(100));
+    i2cMasterReceiveTimeout(&I2CD2, I2C_ADDR, rxbuf, 6, MS2ST(10));
     valid = (rxbuf[3] & 0x03) == 0 && (rxbuf[5] & 0x10);
-    if (!valid) chThdSleepMilliseconds(1);
+    if (!valid) chThdSleepMilliseconds(5);
   } while (!valid && maxtries-- > 0);
   i2cStop(&I2CD2);
 
@@ -59,6 +69,8 @@ bool tlv493_read(int *x, int *y, int *z)
   {
     return false;
   }
+
+//   dbg("%02x %02x\n", rxbuf[0], rxbuf[4] >> 4);
 
   *x = ((int)(int8_t)rxbuf[0] << 4) | (rxbuf[4] >> 4);
   *y = ((int)(int8_t)rxbuf[1] << 4) | (rxbuf[4] & 0x0F);

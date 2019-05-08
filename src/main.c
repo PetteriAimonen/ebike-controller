@@ -9,7 +9,6 @@
 #include "motor_orientation.h"
 #include "motor_sampling.h"
 #include "log_task.h"
-#include "sensor_task.h"
 #include "cart_control_task.h"
 #include "ui_task.h"
 #include "debug.h"
