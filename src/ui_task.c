@@ -115,9 +115,10 @@ static bool config_page(char button)
     config_entry(0, selected, editing, "Exit", NULL, delta);
     config_entry(1, selected, editing, "Acc.bias", &g_system_state.accelerometer_bias_mg, delta);
     config_entry(2, selected, editing, "Acc.val", &acc_z, delta);
-    config_entry(3, selected, editing, "Min.volt", &g_system_state.min_voltage_V, delta);
-    config_entry(4, selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
-    config_entry(5, selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
+    config_entry(3, selected, editing, "Acc.inv", &g_system_state.accelerometer_invert, delta);
+    config_entry(4, selected, editing, "Min.volt", &g_system_state.min_voltage_V, delta);
+    config_entry(5, selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
+    config_entry(6, selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 
@@ -206,11 +207,12 @@ static void ui_thread(void *p)
   
   chThdSleepMilliseconds(5000);
   
-  if (get_battery_voltage_mV() > 38500)
+  if (get_battery_voltage_mV() > 38000)
   {
     g_system_state.total_distance_m = 0;
     g_system_state.total_energy_mJ = 0;
     g_system_state.total_time_ms = 0;
+    save_system_state();
   }
 
   bool in_settings = false;

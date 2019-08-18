@@ -18,6 +18,7 @@ typedef struct
   int min_voltage_V;
   int max_motor_current_A;
   int max_battery_current_A;
+  int accelerometer_invert;
 } system_state_t;
 
 extern volatile system_state_t g_system_state;

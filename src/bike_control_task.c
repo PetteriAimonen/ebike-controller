@@ -203,11 +203,19 @@ static void bike_control_thread(void *p)
     
     z -= g_system_state.accelerometer_bias_mg;
 
+    if (g_system_state.accelerometer_invert)
+      z = -z;
+
     float acceleration = z * 0.00981f;
     float decay = 1.0f / 5;
     g_acceleration = acceleration * decay + g_acceleration * (1 - decay);
     
     if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
+    {
+      g_bike_state = STATE_BRAKING;
+    }
+
+    if (x > 700 || x < -700)
     {
       g_bike_state = STATE_BRAKING;
     }
