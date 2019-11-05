@@ -186,7 +186,15 @@ void bootloader_main()
 {
   bootloader_init_usart();
   bootloader_print("\r\nBootloader\r\n");
+
   char button = bootloader_get_button();
+  char button2 = bootloader_get_button();
+
+  while (button != button2)
+  {
+     button = bootloader_get_button();
+     button2 = bootloader_get_button();
+  }
   
   if (button == '+')
   {

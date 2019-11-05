@@ -223,6 +223,14 @@ static void ui_thread(void *p)
     chThdSleepMilliseconds(50);
     
     char button = ui_get_button();
+    char button2 = ui_get_button();
+
+    while (button != button2)
+    {
+        button = ui_get_button();
+        button2 = ui_get_button();
+    }
+
     if (button == prevButton)
     {
       button = ' ';
