@@ -19,7 +19,7 @@ static void apply_limit(int *max_duty, int limitA, int limitB, int value)
   }
   else
   {
-    max = PWM_MAX_DUTY * (value - limitA) / (limitB - limitA);
+    max = PWM_MAX_DUTY - PWM_MAX_DUTY * (value - limitA) / (limitB - limitA);
   }
   
   if (*max_duty > max)
