@@ -42,6 +42,9 @@ void motor_limits_update_max_duty()
     g_max_duty_filtered += decay;
   else if (max_duty < (int)g_max_duty_filtered)
     g_max_duty_filtered -= decay;
+
+  if (g_max_duty_filtered < 20)
+    g_max_duty_filtered = 20;
 }
 
 int motor_limits_get_max_duty()

@@ -66,6 +66,7 @@ void set_motor_pwm(int angle, int duty)
   float complex v = cexpf(I * f_pi / 180.0f * angle) * duty / 255.0f;
   set_modulation_vector(v);
   TIM1->BDTR |= TIM_BDTR_MOE;
+  TIM3->CCR1 = 1;
 }
 
 float complex get_current_vector()

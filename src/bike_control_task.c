@@ -155,11 +155,12 @@ static void state_powered()
     // Decide assist level
     float assist_flat = ui_get_assist_level() / 100.0f;
     float assist_hill = (2 * assist_flat < 1) ? (2 * assist_flat) : 1;
+    float fudge = (2 * assist_flat - 0.5f) * 0.1f;
     
     float pedal_accel = (max_accel - min_accel) * 0.5f;
     float hill_accel = avg_accel - wheel_accel;
     
-    float target_current = (pedal_accel * assist_flat + hill_accel * assist_hill) * BIKE_WEIGHT_KG / MOTOR_NEWTON_PER_A;
+    float target_current = (pedal_accel * assist_flat + hill_accel * assist_hill + fudge) * BIKE_WEIGHT_KG / MOTOR_NEWTON_PER_A;
     if (target_current < BIKE_MIN_CURRENT_A) target_current = 0;
 
     int max_current = g_system_state.max_motor_current_A;
@@ -194,6 +195,8 @@ static void bike_control_thread(void *p)
   
   chRegSetThreadName("bike_ctrl");
   
+  bool was_stopped = false;
+
   for (;;)
   {
     /* Wait for a new reading from sensors */
@@ -239,10 +242,12 @@ static void bike_control_thread(void *p)
     
     if (g_motor_current > 0)
     {
+      was_stopped = false;
       motor_run((int)(g_motor_current * 1000.0f), 0);
     }
-    else
+    else if (!was_stopped)
     {
+      was_stopped = true;
       motor_stop();
     }
   }

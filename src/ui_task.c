@@ -36,6 +36,7 @@ static char ui_get_button()
   RCC->APB2ENR |= RCC_APB2ENR_ADC3EN;
   ADC3->CR2 = ADC_CR2_ADON;
   ADC3->SQR3 = 11;
+  ADC3->SMPR1 = (7 << 3);
   ADC3->CR2 |= ADC_CR2_SWSTART;
 
   while (!(ADC3->SR & ADC_SR_EOC));
@@ -223,11 +224,13 @@ static void ui_thread(void *p)
     chThdSleepMilliseconds(50);
     
     char button = ui_get_button();
+    chThdSleepMilliseconds(20);
     char button2 = ui_get_button();
 
     while (button != button2)
     {
         button = ui_get_button();
+        chThdSleepMilliseconds(20);
         button2 = ui_get_button();
     }
 

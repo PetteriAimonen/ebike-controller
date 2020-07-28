@@ -43,7 +43,7 @@
 
 // Bike control parameters
 #define MOTOR_NEWTON_PER_A         5.0f
-#define BIKE_WEIGHT_KG            90.0f
+#define BIKE_WEIGHT_KG           100.0f
 #define BIKE_MIN_VELOCITY          0.2f
 #define BIKE_MIN_PEDAL_INTERVAL_S    2
 #define BIKE_BRAKE_THRESHOLD_M_S2  1.0f
