@@ -15,8 +15,8 @@
 volatile system_state_t g_system_state = {
   .accelerometer_bias_mg = 0,
   .min_voltage_V = 33,
-  .max_motor_current_A = 15,
-  .max_battery_current_A = 8
+  .max_motor_current_A = 20,
+  .max_battery_current_A = 12
 };
 
 static uint8_t g_logbuffer1[4096];
@@ -111,7 +111,7 @@ void log_writer_thread(void *p)
 
   for (;;)
   {
-    chThdSleepMilliseconds(50);
+    chThdSleepMilliseconds(100);
     
     static char buf[512];
     chsnprintf(buf, sizeof(buf),

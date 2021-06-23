@@ -208,7 +208,7 @@ static void ui_thread(void *p)
   
   chThdSleepMilliseconds(5000);
   
-  if (get_battery_voltage_mV() > 38000)
+  if (get_battery_voltage_mV() > 40000)
   {
     g_system_state.total_distance_m = 0;
     g_system_state.total_energy_mJ = 0;
