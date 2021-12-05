@@ -132,6 +132,9 @@ void bootloader_write_backup()
 
 void bootloader_restore_backup()
 {
+  if ((__backup_start__[1] >> 24) != 0x08)
+	return;
+
   for (int i = 1; i <= 5; i++)
   {
     bootloader_erase_sector(i);
@@ -203,10 +206,6 @@ void bootloader_main()
   else if (button == '-')
   {
     bootloader_restore_backup();
-  }
-  else if (button == 'K')
-  {
-    bootloader_load_firmware();
   }
   
   /* Now continue to the main application */

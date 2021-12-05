@@ -100,11 +100,14 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
+  int entries = 7;
+
   if (!editing)
   {
     selected += delta;
     delta = 0;
-    if (selected < 0) selected = 0;
+    if (selected < 0) selected = entries - 1;
+    if (selected >= entries) selected = 0;
   }
 
   int acc_x, acc_y, acc_z;
