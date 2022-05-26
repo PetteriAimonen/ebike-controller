@@ -207,6 +207,20 @@ static void bike_control_thread(void *p)
   
   chRegSetThreadName("bike_ctrl");
   
+  /* Make a boot sound */
+  for (int j = 0; j < 2; j++)
+  {
+    chThdSleepMilliseconds(100);
+    for (int i = 0; i < 20; i++)
+    {
+      motor_run(500, 0);
+      chThdSleepMilliseconds(1);
+      motor_run(-500, 0);
+      chThdSleepMilliseconds(1);
+    }
+  }
+  motor_stop();
+  
   bool was_stopped = false;
 
   for (;;)
