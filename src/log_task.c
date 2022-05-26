@@ -67,9 +67,9 @@ void log_saver_thread(void *p)
   f_open(&file, filename, FA_WRITE | FA_CREATE_NEW);
   
   static const char header[] = "# SysTime    Dist.     Vel.    WAcc.    BattU    BattI    Tmosfet     RPM     Duty"
-                               "   Accel  Current    State   Clicks\r\n"
+                               "   Accel  Current    State   Clicks   HillA    PedalA\r\n"
                                "#      ms       m      mm/s   mm^2/s       mV       mA         mC     rpm      pwm"
-                               "   mm/s^2        mA       \r\n";
+                               "   mm/s^2        mA                   mm/s^2   mm/s^2\r\n";
   f_write(&file, header, sizeof(header) - 1, &bytes_written);
   
   systime_t prev_sysstate_save = chVTGetSystemTime();
@@ -111,17 +111,18 @@ void log_writer_thread(void *p)
 
   for (;;)
   {
-    chThdSleepMilliseconds(100);
+//    chThdSleepMilliseconds(50);
+    chThdSleepMilliseconds(1000);
     
     static char buf[512];
     chsnprintf(buf, sizeof(buf),
-             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d\r\n",
+             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d %8d %8d\r\n",
              chVTGetSystemTime(),
              wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
              get_battery_voltage_mV(), get_battery_current_mA(),
-             get_mosfet_temperature_mC(), motor_orientation_get_rpm(), motor_limits_get_max_duty(),
+             get_mosfet_temperature_mC(), motor_orientation_get_fast_rpm(), motor_limits_get_max_duty(),
              bike_control_get_acceleration(), bike_control_get_motor_current(),
-             bike_control_get_state(), ui_get_ok_button_clicks());
+             bike_control_get_state(), ui_get_ok_button_clicks(), bike_control_get_hill_accel(), bike_control_get_pedal_accel());
     
     char *p = buf;
     while (*p)

@@ -27,8 +27,107 @@ static int g_brake_pos;
 
 const char* bike_control_get_state()
 {
-  const char *states[] = {"BOOT", "MOVING", "BRAKING", "POWERED"};
+  const char *states[] = {"BOOT", "BRAKING", "WAITMOVE", "POWERED"};
   return states[g_bike_state];
+}
+
+static float g_accel_history[32];
+static uint32_t g_accel_history_index;
+static float g_prev_pedal_accel;
+static float g_prev_hill_accel;
+static float g_pedal_bandpass[4];
+
+// Detect acceleration due to pedalling with a bandpass filter.
+// Cycling cadence is 30-100 RPM, peak twice per cycle
+// => bandpass filter 1-3 Hz at different offsets and compute amplitude
+float get_pedalling_bandpass()
+{
+  const int filter[15] = {  1809,  134,  253,  3136,  -3360,  -9522,  1982,  13649,  1982,  -9522,  -3360,  3136,  253,  134,  1809 };
+
+  float result = 0.0f;
+  for (int i = 0; i < 15; i++)
+  {
+    result += g_accel_history[(g_accel_history_index - i) & 31] * filter[i];
+  }
+  
+  float s3 = g_pedal_bandpass[3] = g_pedal_bandpass[2];
+  float s2 = g_pedal_bandpass[2] = g_pedal_bandpass[1];
+  float s1 = g_pedal_bandpass[1] = g_pedal_bandpass[0];
+  float s0 = g_pedal_bandpass[0] = result / 32768.0f;
+  
+  float amplitude = __builtin_sqrtf((s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3) / 2);
+  return amplitude;
+}
+
+// Get average acceleration over past 1 second
+// Uses low-pass filter at 0.5 Hz to filter out pedalling
+float get_avg_accel()
+{
+  const int filter[11] = {  -53,  1806,  3004,  4560,  5757,  6206,  5757,  4560,  3004,  1806,  -53};
+
+  float result = 0.0f;
+  for (int i = 0; i < 11; i++)
+  {
+    result += g_accel_history[(g_accel_history_index - i) & 31] * filter[i];
+  }
+  
+  return result / 32768.0f;
+}
+
+// Acceleration history is collected every 100 ms => samplerate 10 Hz
+void update_accel_history()
+{
+  static systime_t prev_time = 0;
+  static float accumulator = 0;
+  static int count = 0;
+  
+  systime_t time_now = chVTGetSystemTime();
+  
+  count++;
+  accumulator += g_acceleration;
+  
+  if (time_now - prev_time >= MS2ST(100))
+  {
+    g_accel_history_index = (g_accel_history_index + 1) & 31;
+    g_accel_history[g_accel_history_index] = accumulator / count;
+    accumulator = 0;
+    count = 0;
+    prev_time = time_now;
+  }
+  
+  float wheel_accel = wheel_speed_get_acceleration();
+
+  g_prev_pedal_accel = get_pedalling_bandpass();
+  g_prev_hill_accel = get_avg_accel() - (wheel_accel > 0 ? wheel_accel : 0);
+}
+
+// Brake button gestures allow double-click to request extra power
+static struct {systime_t start; systime_t end;} g_prev_brake_times[3];
+static void update_brake_gesture()
+{
+  systime_t time_now = chVTGetSystemTime();
+  if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
+  {
+    // Brake is down
+    if ((time_now - g_prev_brake_times[0].end) > MS2ST(20))
+    {
+      // Debounce time passed, count as new one
+      g_prev_brake_times[2] = g_prev_brake_times[1];
+      g_prev_brake_times[1] = g_prev_brake_times[0];
+      g_prev_brake_times[0].start = time_now;
+    }
+    g_prev_brake_times[0].end = time_now;
+  }
+}
+static bool has_brake_doubleclick()
+{
+  int length1 = g_prev_brake_times[0].end - g_prev_brake_times[0].start;
+  int delta = g_prev_brake_times[0].start - g_prev_brake_times[1].end;
+  int length2 = g_prev_brake_times[1].end - g_prev_brake_times[1].start;
+  
+  return (length1 > MS2ST(50) && length1 < MS2ST(800) &&
+          delta > MS2ST(50) && delta < MS2ST(800) &&
+          length2 > MS2ST(50) && length2 < MS2ST(800));
 }
 
 int bike_control_get_acceleration()
@@ -36,9 +135,14 @@ int bike_control_get_acceleration()
   return 1000 * g_acceleration;
 }
 
-int bike_control_get_acceleration_mg()
+int bike_control_get_pedal_accel()
 {
-  return (1000.0f/9.81f) * g_acceleration;
+  return 1000 * g_prev_pedal_accel;
+}
+
+int bike_control_get_hill_accel()
+{
+  return 1000 * g_prev_hill_accel;
 }
 
 int bike_control_get_motor_current()
@@ -82,54 +186,11 @@ static void state_waitmove()
 
 static void state_powered()
 {
-  static systime_t prev_time;
-  static float max_accel;
-  static systime_t max_accel_time;
-  static float min_accel;
-  static systime_t min_accel_time;
-  static float avg_accel;
-  static int stall_count;
-  
-  systime_t time_now = chVTGetSystemTime();
-  systime_t delta = time_now - prev_time;
-  float delta_s = delta / (float)(S2ST(1));
-  prev_time = time_now;
-  
-  if (delta_s > 0.1f)
-  {
-    max_accel = min_accel = avg_accel = g_acceleration;
-    return; // First timestep
-  }
-  
-  float decay = delta_s / BIKE_MIN_PEDAL_INTERVAL_S;
-  
-  // Keep track of max and min acceleration during this pedalling period
-  if (g_acceleration > max_accel)
-  {
-    max_accel = g_acceleration;
-    max_accel_time = time_now;
-  }
-  else if (time_now - max_accel_time > S2ST(BIKE_MIN_PEDAL_INTERVAL_S))
-  {
-    max_accel = g_acceleration * decay + max_accel * (1 - decay);
-  }
-  
-  if (g_acceleration < min_accel)
-  {
-    min_accel = g_acceleration;
-    min_accel_time = time_now;
-  }
-  else if (time_now - min_accel_time > S2ST(BIKE_MIN_PEDAL_INTERVAL_S))
-  {
-    min_accel = g_acceleration * decay + min_accel * (1 - decay);
-  }
-  
-  // Keep track of average acceleration
-  avg_accel = g_acceleration * decay + avg_accel * (1 - decay);
-  
+  float wheel_velocity = wheel_speed_get_velocity();
   float wheel_accel = wheel_speed_get_acceleration();
-  float velocity = wheel_speed_get_velocity();
-  
+
+  // Detect if the wheel stops
+  static int stall_count;
   if (g_motor_current > 0 && (motor_orientation_get_rpm() < 60 || !motor_orientation_in_sync()))
   {
     stall_count++;
@@ -138,64 +199,99 @@ static void state_powered()
   {
     stall_count = 0;
   }
-
-  if (stall_count > 500 || velocity < BIKE_MIN_VELOCITY)
+  
+  if (stall_count > 500 || wheel_velocity < BIKE_MIN_VELOCITY)
   {
     // Wheel is stopped
     g_motor_current = 0.0f;
     g_bike_state = STATE_BOOT;
+    return;
   }
-  else if (velocity > BIKE_MAX_VELOCITY)
+  
+  // Compute timestep
+  static systime_t prev_time;
+  systime_t time_now = chVTGetSystemTime();
+  systime_t delta = time_now - prev_time;
+  if (delta > MS2ST(100)) delta = MS2ST(100);
+  float delta_s = delta / (float)(S2ST(1));
+  prev_time = time_now;
+  
+  // Lowpass filter will be applied to target current
+  float target_current = 0.0f;
+  float decay_time = BIKE_TORQUE_FILTER_S;
+  float max_current = g_system_state.max_motor_current_A;
+  
+  if (wheel_velocity > BIKE_MAX_VELOCITY)
   {
     // Maximum speed
-    float decay = delta_s / 2.0f;
-    g_motor_current *= (1.0f - decay);
-    
-    if (g_motor_current < BIKE_MIN_CURRENT_A)
-    {
-      g_motor_current = 0;
-    }
+    target_current = 0.0f;
+    decay_time = 2.0f;
   }
-  else if (min_accel < -BIKE_BRAKE_THRESHOLD_B_M_S2 || wheel_accel < -BIKE_BRAKE_THRESHOLD_M_S2)
+  else if (g_acceleration < -BIKE_BRAKE_THRESHOLD_B_M_S2 || wheel_accel < -BIKE_BRAKE_THRESHOLD_M_S2)
   {
     // Soft braking
-    g_motor_current = 0.0f;
-    max_accel = min_accel = avg_accel = g_acceleration;
+    decay_time = 0.2f;
+    target_current = 0.0f;
   }
   else
   {
     // Decide assist level
-    float assist_flat = ui_get_assist_level() / 100.0f;
-    float assist_hill = (2 * assist_flat < 1) ? (2 * assist_flat) : 1;
-    float fudge = (2 * assist_flat - 0.5f) * 0.1f;
-    
-    float pedal_accel = (max_accel - min_accel) * 0.5f;
-    float hill_accel = avg_accel - wheel_accel;
-    
-    float target_current = (pedal_accel * assist_flat + hill_accel * assist_hill + fudge) * BIKE_WEIGHT_KG / MOTOR_NEWTON_PER_A;
-    if (target_current < BIKE_MIN_CURRENT_A) target_current = 0;
-
-    int max_current = g_system_state.max_motor_current_A;
-    if (target_current > max_current) target_current = max_current;
-    
-    float decay = delta_s / BIKE_TORQUE_FILTER_S;
-    
-    if (g_motor_current < BIKE_SOFTSTART_A)
+    float assist_flat = 0.25f;
+    float assist_hill = 1.0f;
+    float fudge = 0.0f;
+    float min_pedal_accel = BIKE_MIN_PEDAL_ACCEL;
+    if (ui_get_assist_level() <= 25)
     {
-      if (g_motor_current < target_current)
-      {
-        g_motor_current += BIKE_SOFTSTART_A * delta_s / 0.5f;
-      }
+        assist_flat = 0.1f;
+        assist_hill = 0.75f;
+        fudge = -0.1f;
+    }
+    else if (ui_get_assist_level() >= 75)
+    {
+        assist_flat = 0.5f;
+        assist_hill = 1.5f;
+        fudge = 0.1f;
+        min_pedal_accel *= 0.5f;
+    }
+    
+    if (has_brake_doubleclick() && (time_now - g_brake_time) < S2ST(10))
+    {
+      // Extra power when brake lever is double-clicked
+      assist_hill = 1.5f;
+      assist_flat = 0.5f;
+      fudge = 0.5f;
+      max_current = 25;
+      min_pedal_accel = 0.0f;
+    }
+    
+    
+    if (g_prev_pedal_accel < min_pedal_accel)
+    {
+      target_current = 0;
     }
     else
     {
-      g_motor_current = target_current * decay + g_motor_current * (1 - decay);
+      target_current = (g_prev_pedal_accel * assist_flat + g_prev_hill_accel * assist_hill + fudge) * BIKE_WEIGHT_KG / MOTOR_NEWTON_PER_A;
     }
-      
-    if (g_motor_current < BIKE_MIN_CURRENT_A && target_current == 0)
-    {
-      g_motor_current = 0;
-    }
+  }
+  
+  if (g_motor_current < BIKE_SOFTSTART_A && g_motor_current < target_current)
+  {
+    g_motor_current += BIKE_SOFTSTART_A * delta_s / BIKE_SOFTSTART_S;
+  }
+  else if (g_motor_current < BIKE_MIN_CURRENT_A && target_current < BIKE_MIN_CURRENT_A)
+  {
+    g_motor_current = 0;
+  }
+  else
+  {
+    float current_decay = delta_s / decay_time;
+    g_motor_current = target_current * current_decay + g_motor_current * (1 - current_decay);
+  }
+  
+  if (g_motor_current > max_current)
+  {
+    g_motor_current = max_current;
   }
 }
 
@@ -211,11 +307,11 @@ static void bike_control_thread(void *p)
   for (int j = 0; j < 2; j++)
   {
     chThdSleepMilliseconds(100);
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 25; i++)
     {
-      motor_run(500, 0);
+      motor_run(700, 0);
       chThdSleepMilliseconds(1);
-      motor_run(-500, 0);
+      motor_run(-700, 0);
       chThdSleepMilliseconds(1);
     }
   }
@@ -227,6 +323,7 @@ static void bike_control_thread(void *p)
   {
     /* Wait for a new reading from sensors */
     chEvtWaitAny(ALL_EVENTS);
+    
     int x, y, z;
     sensors_get_accel(&x, &y, &z);
     
@@ -239,12 +336,15 @@ static void bike_control_thread(void *p)
     float decay = 1.0f / 5;
     g_acceleration = acceleration * decay + g_acceleration * (1 - decay);
     
+    update_accel_history();
+    update_brake_gesture();
+    
     if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
     {
       g_bike_state = STATE_BRAKING;
     }
 
-    if (x > 700 || x < -700)
+    if (x > 500 || x < -500)
     {
       g_bike_state = STATE_BRAKING;
     }
