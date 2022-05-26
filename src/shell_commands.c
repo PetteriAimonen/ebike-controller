@@ -242,6 +242,10 @@ static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "Acceleration:         %8d mg\r\n", bike_control_get_acceleration());
   chprintf(chp, "Motor target current: %8d mA\r\n", bike_control_get_motor_current());
   chprintf(chp, "Motor max duty:       %8d\r\n",    motor_limits_get_max_duty());
+  
+  int p1, p3;
+  motor_get_currents(&p1, &p3);
+  chprintf(chp, "Phase currents:       %8d mA, %8d mA\r\n", p1, p3);
 }
 
 static void cmd_i2c(BaseSequentialStream *chp, int argc, char *argv[])

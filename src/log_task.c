@@ -15,7 +15,7 @@
 volatile system_state_t g_system_state = {
   .accelerometer_bias_mg = 0,
   .min_voltage_V = 33,
-  .max_motor_current_A = 20,
+  .max_motor_current_A = 15,
   .max_battery_current_A = 12
 };
 
