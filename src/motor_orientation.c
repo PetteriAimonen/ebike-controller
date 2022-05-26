@@ -79,7 +79,7 @@ void motor_orientation_update()
   }
   
   int delta = angle_diff(hall_angle, g_hall_prev_angle);
-  if (delta != 0)
+  if (delta > 0)
   {
     // Moved from one sector to the next, current angle is
     // quite accurately in between the two.
@@ -108,7 +108,7 @@ void motor_orientation_update()
       g_motor_rpm += rpm_delta / 12;
     }
     
-    g_hall_time_since_change = 0;
+    g_hall_time_since_change = 1;
     g_hall_prev_angle = hall_angle;
   }
   else
