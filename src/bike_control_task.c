@@ -128,8 +128,9 @@ static void state_powered()
   avg_accel = g_acceleration * decay + avg_accel * (1 - decay);
   
   float wheel_accel = wheel_speed_get_acceleration();
+  float velocity = wheel_speed_get_velocity();
   
-  if (g_motor_current > 0 && motor_orientation_get_rpm() < 60)
+  if (g_motor_current > 0 && (motor_orientation_get_rpm() < 60 || !motor_orientation_in_sync()))
   {
     stall_count++;
   }
@@ -137,12 +138,23 @@ static void state_powered()
   {
     stall_count = 0;
   }
-  
-  if (stall_count > 500 || wheel_speed_get_velocity() < BIKE_MIN_VELOCITY)
+
+  if (stall_count > 500 || velocity < BIKE_MIN_VELOCITY)
   {
     // Wheel is stopped
     g_motor_current = 0.0f;
     g_bike_state = STATE_BOOT;
+  }
+  else if (velocity > BIKE_MAX_VELOCITY)
+  {
+    // Maximum speed
+    float decay = delta_s / 2.0f;
+    g_motor_current *= (1.0f - decay);
+    
+    if (g_motor_current < BIKE_MIN_CURRENT_A)
+    {
+      g_motor_current = 0;
+    }
   }
   else if (min_accel < -BIKE_BRAKE_THRESHOLD_B_M_S2 || wheel_accel < -BIKE_BRAKE_THRESHOLD_M_S2)
   {

@@ -11,6 +11,7 @@ static int g_motor_rpm_adj_P;
 static int g_motor_lockcount;
 static int g_hall_time_since_change;
 static int g_hall_prev_angle;
+static int g_hall_error_count;
 static float g_motor_filtered_rpm;
 
 #define LOCK_THRESHOLD 5
@@ -50,15 +51,20 @@ void motor_orientation_update()
 {
   int sector = motor_orientation_get_hall_sector();
   
-  static int hall_error_count = 0;
   if (sector < 0)
   {
-    hall_error_count++;
-    if (hall_error_count > 100 && g_have_motor)
+    g_hall_error_count++;
+    
+    if (g_hall_error_count > 500)
     {
-      abort_with_error("HALL_ERROR");
+        g_motor_lockcount = 0;
+        g_motor_rpm = 0;
     }
     return;
+  }
+  else
+  {
+    g_hall_error_count = 0;
   }
   
   int hall_angle = 360 - sector * 60 + 30;
@@ -127,6 +133,11 @@ void motor_orientation_update()
   // Filter the motor RPM estimate for less speed critical uses
   float decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
   g_motor_filtered_rpm = g_motor_filtered_rpm * (1 - decay) + g_motor_rpm * decay;
+}
+
+bool motor_orientation_in_sync()
+{
+    return g_motor_lockcount > LOCK_THRESHOLD;
 }
 
 int motor_orientation_get_angle()

@@ -31,7 +31,7 @@
 // For each, A point gives the start of the linear duty lowering,
 // and B point is where the duty drops to 0%.
 #define MOTOR_MAX_RPM_A         7800
-#define MOTOR_MAX_RPM_B         8500
+#define MOTOR_MAX_RPM_B         10000
 #define MOTOR_MAX_TEMP_A          50000
 #define MOTOR_MAX_TEMP_B          70000
 #define MOSFET_MAX_TEMP_A         60000
@@ -45,6 +45,7 @@
 #define MOTOR_NEWTON_PER_A         5.0f
 #define BIKE_WEIGHT_KG           100.0f
 #define BIKE_MIN_VELOCITY          0.2f
+#define BIKE_MAX_VELOCITY          7.5f
 #define BIKE_MIN_PEDAL_INTERVAL_S    2
 #define BIKE_BRAKE_THRESHOLD_M_S2  1.0f
 #define BIKE_BRAKE_THRESHOLD_B_M_S2  5.0f

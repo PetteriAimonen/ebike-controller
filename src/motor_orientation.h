@@ -21,3 +21,6 @@ int motor_orientation_get_fast_rpm();
 
 // Returns filtered RPM value
 int motor_orientation_get_rpm();
+
+// Return true if motor is spinning steadily
+bool motor_orientation_in_sync();
