@@ -54,7 +54,10 @@ float wheel_speed_get_acceleration()
   float vdelta = new_speed - old_speed;
   float tdelta = interval_sum / (float)CONTROL_FREQ;
   
-  return vdelta / tdelta;
+  if (tdelta > 0.01f)
+      return vdelta / tdelta;
+  else
+      return 0.0f;
 }
 
 int wheel_speed_get_distance()
