@@ -100,12 +100,11 @@ void update_accel_history()
     accumulator = 0;
     count = 0;
     prev_time = time_now;
-  }
   
-  float wheel_accel = wheel_speed_get_acceleration();
-
-  g_prev_pedal_accel = get_pedalling_bandpass();
-  g_prev_hill_accel = get_avg_accel() - (wheel_accel > 0 ? wheel_accel : 0);
+    float wheel_accel = wheel_speed_get_acceleration();
+    g_prev_pedal_accel = get_pedalling_bandpass();
+    g_prev_hill_accel = get_avg_accel() - (wheel_accel > 0 ? wheel_accel : 0);
+  }
 }
 
 // Brake button gestures allow double-click to request extra power
