@@ -13,7 +13,7 @@ static int g_time_since_falling;
 static int g_previous_interval;
 static float g_velocity_filtered;
 static bool g_previous_state;
-static int g_previous_interval_history[4];
+static int g_previous_interval_history[6];
 
 float interval_to_velocity(int interval)
 {
@@ -37,27 +37,17 @@ float wheel_speed_get_velocity()
 
 float wheel_speed_get_acceleration()
 {
-  float new_speed = wheel_speed_get_velocity();
-  float old_speed = interval_to_velocity(g_previous_interval_history[3]);
-  
-  int interval_sum = g_previous_interval;
-  for (int i = 0; i < 3; i++)
+  float sum_accel = 0.0f;
+  for (int i = 0; i < 5; i++)
   {
-    interval_sum += g_previous_interval_history[i];
+    float speed1 = interval_to_velocity(g_previous_interval_history[i]);
+    float speed2 = interval_to_velocity(g_previous_interval_history[i+1]);
+    float time = (g_previous_interval_history[i] + g_previous_interval_history[i + 1]) / (2.0f * CONTROL_FREQ);
+    float accel = (time > 0.01f) ? ((speed1 - speed2) / time) : 0.0f;
+    sum_accel += accel;
   }
   
-  if (interval_sum == 0)
-  {
-    return 0.0f;
-  }
-  
-  float vdelta = new_speed - old_speed;
-  float tdelta = interval_sum / (float)CONTROL_FREQ;
-  
-  if (tdelta > 0.01f)
-      return vdelta / tdelta;
-  else
-      return 0.0f;
+  return sum_accel / 5.0f;
 }
 
 int wheel_speed_get_distance()
@@ -79,13 +69,12 @@ void wheel_speed_update()
     if (g_time_since_falling > 10) // Debounce
     {
       // Rising edge
-      for (int i = 3; i > 0; i--)
+      for (int i = 5; i > 0; i--)
       {
         g_previous_interval_history[i] = g_previous_interval_history[i-1];
       }
       
-      g_previous_interval_history[0] = g_previous_interval;
-      g_previous_interval = g_time_since_rising;
+      g_previous_interval_history[0] = g_previous_interval = g_time_since_rising;
       g_wheel_tickcount++;
       g_time_since_rising = 0;
       g_previous_state = true;

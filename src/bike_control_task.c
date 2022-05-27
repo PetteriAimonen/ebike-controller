@@ -35,7 +35,7 @@ static float g_accel_history[32];
 static uint32_t g_accel_history_index;
 static float g_prev_pedal_accel;
 static float g_prev_hill_accel;
-static float g_pedal_bandpass[4];
+static float g_pedal_bandpass[8];
 
 // Detect acceleration due to pedalling with a bandpass filter.
 // Cycling cadence is 30-100 RPM, peak twice per cycle
@@ -44,18 +44,25 @@ float get_pedalling_bandpass()
 {
   const int filter[15] = {  1809,  134,  253,  3136,  -3360,  -9522,  1982,  13649,  1982,  -9522,  -3360,  3136,  253,  134,  1809 };
 
-  float result = 0.0f;
+  // Bandpass filter past samples
+  float bandpass = 0.0f;
   for (int i = 0; i < 15; i++)
   {
-    result += g_accel_history[(g_accel_history_index - i) & 31] * filter[i];
+    bandpass += g_accel_history[(g_accel_history_index - i) & 31] * filter[i];
   }
+  bandpass /= 32768.0f;
   
-  float s3 = g_pedal_bandpass[3] = g_pedal_bandpass[2];
-  float s2 = g_pedal_bandpass[2] = g_pedal_bandpass[1];
-  float s1 = g_pedal_bandpass[1] = g_pedal_bandpass[0];
-  float s0 = g_pedal_bandpass[0] = result / 32768.0f;
+  // Calculate RMS sum over past 8 bandpass results
+  float rms = bandpass * bandpass;
+  for (int i = 0; i < 7; i++)
+  {
+    rms += g_pedal_bandpass[i] * g_pedal_bandpass[i];
+    g_pedal_bandpass[i+1] = g_pedal_bandpass[i];
+  }
+  g_pedal_bandpass[0] = bandpass;
   
-  float amplitude = __builtin_sqrtf((s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3) / 2);
+  // Calculate peak amplitude: sqrt(sum / 8) * sqrt(2)
+  float amplitude = __builtin_sqrtf(rms / 4);
   return amplitude;
 }
 
@@ -245,13 +252,14 @@ static void state_powered()
         assist_flat = 0.1f;
         assist_hill = 0.75f;
         fudge = -0.1f;
+        min_pedal_accel *= 2.0f;
     }
     else if (ui_get_assist_level() >= 75)
     {
         assist_flat = 0.5f;
         assist_hill = 1.5f;
         fudge = 0.1f;
-        min_pedal_accel *= 0.5f;
+        min_pedal_accel = 0.0f;
     }
     
     if (has_brake_doubleclick() && (time_now - g_brake_time) < S2ST(10))
@@ -260,7 +268,7 @@ static void state_powered()
       assist_hill = 1.5f;
       assist_flat = 0.5f;
       fudge = 0.5f;
-      max_current = 25;
+      max_current += 5;
       min_pedal_accel = 0.0f;
     }
     
@@ -268,6 +276,7 @@ static void state_powered()
     if (g_prev_pedal_accel < min_pedal_accel)
     {
       target_current = 0;
+      decay_time = 2.0f;
     }
     else
     {

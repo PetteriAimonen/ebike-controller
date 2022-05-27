@@ -48,8 +48,8 @@
 #define BIKE_MAX_VELOCITY          7.5f
 #define BIKE_BRAKE_THRESHOLD_M_S2  1.0f
 #define BIKE_BRAKE_THRESHOLD_B_M_S2  5.0f
-#define BIKE_TORQUE_FILTER_S       1.0f
+#define BIKE_TORQUE_FILTER_S       0.5f
 #define BIKE_MIN_CURRENT_A         0.2f
 #define BIKE_SOFTSTART_A           0.5f
 #define BIKE_SOFTSTART_S           0.3f
-#define BIKE_MIN_PEDAL_ACCEL       0.2f
+#define BIKE_MIN_PEDAL_ACCEL       0.1f
