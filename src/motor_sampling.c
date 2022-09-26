@@ -55,22 +55,26 @@ void motor_sampling_init()
   // Calculate DC offset
   ADC1->JOFR1 = ADC2->JOFR1 = 0;
   palSetPad(GPIOA, GPIOA_DC_CAL);
-  chThdSleepMilliseconds(50);
   
-  // Take average of 10 samples
+  // Enable TIM1 for sampling at the target rate
+  TIM1->BDTR &= ~ TIM_BDTR_MOE;
+  TIM1->CR1 |= TIM_CR1_CEN;
+  chThdSleepMilliseconds(50);
+
+  // Take average of 100 samples
   int j1 = 0;
   int j2 = 0;
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 100; i++)
   {
-    ADC1->CR2 |= ADC_CR2_JSWSTART;
-    chThdSleepMilliseconds(2);
+    chThdSleepMilliseconds(1);
     j1 += ADC1->JDR1;
     j2 += ADC2->JDR1;
   }
   palClearPad(GPIOA, GPIOA_DC_CAL);
+  TIM1->CR1 &= ~TIM_CR1_CEN;
   chThdSleepMilliseconds(5);
-  ADC1->JOFR1 = j1/10;
-  ADC2->JOFR1 = j2/10;
+  ADC1->JOFR1 = j1/100;
+  ADC2->JOFR1 = j2/100;
   
   g_enable_sampling = true;
 }
@@ -115,7 +119,10 @@ void motor_sampling_update_voltage()
   float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
   g_battery_voltage = mV;
 
-  ADC1->CR2 |= ADC_CR2_JSWSTART;
+  if (!(TIM1->CR1 & TIM_CR1_CEN))
+  {
+    ADC1->CR2 |= ADC_CR2_JSWSTART;
+  }
 }
 
 void motor_sampling_update()
