@@ -58,7 +58,9 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_CC_HANDLER)
     if (duty < 0) duty = 0;
     if (duty > PWM_MAX_DUTY) duty = PWM_MAX_DUTY;
 
-    if (battery_mV < 30000 || battery_mV >= 44000)
+    int temperature_mC = get_mosfet_temperature_mC();
+
+    if (battery_mV < 30000 || battery_mV >= 44000 || temperature_mC > 90000)
     {
         // Disable outputs
         TIM3->CNT = 0;
