@@ -25,7 +25,7 @@ static float g_motor_filtered_rpm;
 // 110=6    4
 // 100=4    5
 // 101=5    6
-const int g_hall_table[8] = {-1, 1, 3, 2, 5, 6, 4, -1};
+const int g_hall_table[8] = {-2, 1, 3, 2, 5, 6, 4, -1};
 
 int motor_orientation_get_hall_sector()
 {

@@ -165,6 +165,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
   }
   
   TIM3->CNT = 10;
+  TIM3->CR1 |= TIM_CR1_CEN;
   
   int irq_time = TIM1->CNT;
   if (irq_time > g_interrupt_time)
@@ -246,7 +247,7 @@ void start_motor_control()
   TIM3->CCR1 = 1;
   TIM3->CCER = TIM_CCER_CC1E;
   TIM3->PSC = STM32_TIMCLK1 / CONTROL_FREQ - 1;
-  TIM3->ARR = CONTROL_FREQ; // Not used, one pulse mode
+  TIM3->ARR = 1; // Value the timer stops at in one pulse mode
   TIM3->CNT = CONTROL_FREQ; // For DC offset calibration
   TIM3->CR1 |= TIM_CR1_CEN;
   
@@ -261,7 +262,6 @@ void start_motor_control()
   
   // Start the timer
   TIM1->CR1 |= TIM_CR1_CEN;
-  palSetPad(GPIOB, GPIOB_EN_GATE);
 }
 
 void stop_motor_control()

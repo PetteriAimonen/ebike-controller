@@ -8,6 +8,7 @@
 #include "board.h"
 #include "shell_commands.h"
 #include "motor_control.h"
+#include "dcdc_control.h"
 #include "motor_orientation.h"
 #include "motor_sampling.h"
 #include <ff.h>
@@ -167,6 +168,21 @@ static void cmd_motor_samples(BaseSequentialStream *chp, int argc, char *argv[])
   motor_sampling_print(chp);
 }
 
+static void cmd_dcdc_out(BaseSequentialStream *chp, int argc, char *argv[])
+{
+  if (argc < 2)
+  {
+    chprintf(chp, "Usage: dcdc_out <voltage_mV> <current_mA>\r\n");
+    return;
+  }
+
+  int mV = atoi(argv[0]);
+  int mA = atoi(argv[1]);
+
+  start_dcdc_control();
+  set_dcdc_mode(DCDC_OUTPUT_CCCV, mV, mA);
+}
+
 static void cmd_ls(BaseSequentialStream *chp, int argc, char *argv[])
 {
   DIR directory;
@@ -313,5 +329,6 @@ const ShellCommand shell_commands[] = {
   {"status", cmd_status},
   {"i2c", cmd_i2c},
   {"oled", cmd_oled},
+  {"dcdc_out", cmd_dcdc_out},
   {NULL, NULL}
 };

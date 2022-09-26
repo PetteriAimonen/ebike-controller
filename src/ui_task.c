@@ -2,8 +2,10 @@
 #include "motor_sampling.h"
 #include "motor_limits.h"
 #include "motor_config.h"
+#include "motor_orientation.h"
 #include "log_task.h"
 #include "sensor_task.h"
+#include "dcdc_control.h"
 #include <ch.h>
 #include <hal.h>
 #include <chprintf.h>
@@ -111,8 +113,9 @@ static bool config_page(char button)
   }
 
   int acc_x, acc_y, acc_z;
-
   sensors_get_accel(&acc_x, &acc_y, &acc_z);
+
+  int hall_in = motor_orientation_get_hall_sector();
 
   u8g_FirstPage(&u8g);
   do {
@@ -123,6 +126,7 @@ static bool config_page(char button)
     config_entry(4, selected, editing, "Min.volt", &g_system_state.min_voltage_V, delta);
     config_entry(5, selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
     config_entry(6, selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
+    config_entry(7, selected, editing, "Hall in.", &hall_in, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 
@@ -138,6 +142,59 @@ static bool config_page(char button)
   {
     return true;
   }
+}
+
+static void powerout_page(char button)
+{
+  static int voltage = 0;
+
+  if (button == '+')
+    voltage++;
+  else if (button == '-')
+    voltage--;
+
+  if (voltage < 0) voltage = 0;
+  if (voltage > 40) voltage = 40;
+
+  int secs = chVTGetSystemTime() / MS2ST(1000);
+    
+  int p1, p3;
+  motor_get_currents(&p1, &p3);
+  int current = -p3 / 100;
+  int abscur = (current < 0) ? -current : current;
+  int V_x10 = get_battery_voltage_mV() / 100;
+  int Wh_x10 = g_system_state.total_energy_mJ / 360000;
+
+  u8g_FirstPage(&u8g);
+  do {
+    char buf[64];
+
+    // Current time
+    u8g_SetFont(&u8g, u8g_font_courB18);
+    chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d",
+              secs / 3600, (secs % 3600) / 60, secs % 60);
+    u8g_DrawStr(&u8g, 5, 18, buf);
+    
+    // Output voltage and current
+    u8g_SetFont(&u8g, u8g_font_8x13);
+    chsnprintf(buf, sizeof(buf), "Out %2d V, %c%d.%01d A",
+               voltage, (current < 0) ? '-' : '+', abscur / 10, abscur % 10);
+    u8g_DrawStr(&u8g, 0, 34, buf);
+    
+    // Battery volts
+    u8g_SetFont(&u8g, u8g_font_8x13);
+    chsnprintf(buf, sizeof(buf), "Bat: %2d.%01d V",
+               V_x10 / 10, V_x10 % 10);
+    u8g_DrawStr(&u8g, 0, 48, buf);
+
+    // Total energy used, assist level
+    u8g_SetFont(&u8g, u8g_font_8x13);
+    chsnprintf(buf, sizeof(buf), "Tot: %3d.%01d Wh",
+               Wh_x10 / 10, Wh_x10 % 10);
+    u8g_DrawStr(&u8g, 0, 62, buf);
+  } while (u8g_NextPage(&u8g));
+
+  set_dcdc_mode(DCDC_OUTPUT_CCCV, voltage * 1000, 10000);
 }
 
 static void status_page(char button)
@@ -219,9 +276,16 @@ static void ui_thread(void *p)
     save_system_state();
   }
 
+  bool is_powerout = (motor_orientation_get_hall_sector() == -2);
   bool in_settings = false;
   systime_t prevTime = chVTGetSystemTime();
   char prevButton = ' ';
+
+  if (is_powerout)
+  {
+    start_dcdc_control();
+  }
+
   while (1)
   {
     chThdSleepMilliseconds(50);
@@ -265,7 +329,11 @@ static void ui_thread(void *p)
     {
       prevTime = timeNow;
 
-      if (!in_settings)
+      if (is_powerout)
+      {
+        powerout_page(button);
+      }
+      else if (!in_settings)
       {
         status_page(button);
       }

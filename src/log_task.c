@@ -109,35 +109,41 @@ void log_writer_thread(void *p)
   int prev_distance = 0;
   systime_t prev_time = 0;
 
+  int log_div = 0;
+  
   for (;;)
   {
-//    chThdSleepMilliseconds(50);
-    chThdSleepMilliseconds(1000);
+    chThdSleepMilliseconds(50);
     
-    static char buf[512];
-    chsnprintf(buf, sizeof(buf),
-             "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d %8d %8d\r\n",
-             chVTGetSystemTime(),
-             wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
-             get_battery_voltage_mV(), get_battery_current_mA(),
-             get_mosfet_temperature_mC(), motor_orientation_get_fast_rpm(), motor_limits_get_max_duty(),
-             bike_control_get_acceleration(), bike_control_get_motor_current(),
-             bike_control_get_state(), ui_get_ok_button_clicks(), bike_control_get_hill_accel(), bike_control_get_pedal_accel());
-    
-    char *p = buf;
-    while (*p)
+    log_div++;
+    if (log_div >= 10)
     {
-      uint8_t *dest = (write_next == EVENT_BUF1) ? g_logbuffer1 : g_logbuffer2;
-      while (*p && writeptr < sizeof(g_logbuffer1))
+      log_div = 0;
+      static char buf[512];
+      chsnprintf(buf, sizeof(buf),
+              "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d %8d %8d\r\n",
+              chVTGetSystemTime(),
+              wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
+              get_battery_voltage_mV(), get_battery_current_mA(),
+              get_mosfet_temperature_mC(), motor_orientation_get_fast_rpm(), motor_limits_get_max_duty(),
+              bike_control_get_acceleration(), bike_control_get_motor_current(),
+              bike_control_get_state(), ui_get_ok_button_clicks(), bike_control_get_hill_accel(), bike_control_get_pedal_accel());
+
+      char *p = buf;
+      while (*p)
       {
-        dest[writeptr++] = *p++;
-      }
-      
-      if (writeptr == sizeof(g_logbuffer1))
-      {
-        chEvtSignal(g_logsaver, write_next);
-        write_next = (write_next == EVENT_BUF1) ? EVENT_BUF2 : EVENT_BUF1;
-        writeptr = 0;
+        uint8_t *dest = (write_next == EVENT_BUF1) ? g_logbuffer1 : g_logbuffer2;
+        while (*p && writeptr < sizeof(g_logbuffer1))
+        {
+          dest[writeptr++] = *p++;
+        }
+        
+        if (writeptr == sizeof(g_logbuffer1))
+        {
+          chEvtSignal(g_logsaver, write_next);
+          write_next = (write_next == EVENT_BUF1) ? EVENT_BUF2 : EVENT_BUF1;
+          writeptr = 0;
+        }
       }
     }
 
@@ -148,7 +154,7 @@ void log_writer_thread(void *p)
     systime_t delta_t = chVTGetSystemTime() - prev_time;
     g_system_state.total_time_ms += ST2MS(delta_t);
     prev_time += delta_t;
-    g_system_state.total_energy_mJ += (get_battery_voltage_mV() * get_battery_current_mA() / 1000 * (int)(ST2MS(delta_t)) + 500) / 1000;
+    g_system_state.total_energy_mJ += ((int64_t)get_battery_voltage_mV() * get_battery_current_mA() * (int)(ST2MS(delta_t)) + 500) / 1000;
   }
 }
 

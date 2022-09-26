@@ -22,6 +22,9 @@ PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_com
 # Motor control
 PROJECT_CSRC += src/motor_control.c src/motor_orientation.c src/motor_sampling.c src/motor_limits.c
 
+# DCDC control
+PROJECT_CSRC += src/dcdc_control.c
+
 # Sensors
 PROJECT_CSRC += src/lsm6ds3.c src/sensor_task.c src/wheel_speed.c
 
@@ -59,7 +62,7 @@ debug:
 		-ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
 
 debugraw:
-	$(GDB) -iex 'target remote | $(OOCD) -d1 $(OOCDFLAGS) \
+	$(GDB) -iex 'target extended | $(OOCD) -d1 $(OOCDFLAGS) \
 		-c "gdb_port pipe"' -iex 'mon halt' -ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
 
 %.o: %.c
