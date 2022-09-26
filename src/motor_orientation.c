@@ -144,7 +144,18 @@ int motor_orientation_get_angle()
 {
   if (g_motor_lockcount > LOCK_THRESHOLD)
   {
-    return g_motor_angle;
+    int angle = g_motor_angle;
+    int hall_angle = g_hall_prev_angle;
+    int diff = angle_diff(angle, hall_angle);
+
+    if (diff < -40 || diff > 40)
+    {
+      return hall_angle;
+    }
+    else
+    {
+      return g_motor_angle;
+    }
   }
   else
   {
