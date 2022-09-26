@@ -116,6 +116,7 @@ static bool config_page(char button)
   sensors_get_accel(&acc_x, &acc_y, &acc_z);
 
   int hall_in = motor_orientation_get_hall_sector();
+  int temperature = get_mosfet_temperature_mC() / 1000;
 
   u8g_FirstPage(&u8g);
   do {
@@ -127,6 +128,7 @@ static bool config_page(char button)
     config_entry(5, selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
     config_entry(6, selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
     config_entry(7, selected, editing, "Hall in.", &hall_in, delta);
+    config_entry(8, selected, editing, "Temperat", &temperature, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 
@@ -329,21 +331,21 @@ static void ui_thread(void *p)
     {
       prevTime = timeNow;
 
-      if (is_powerout)
-      {
-        powerout_page(button);
-      }
-      else if (!in_settings)
-      {
-        status_page(button);
-      }
-      else
+      if (in_settings)
       {
         if (!config_page(button))
         {
           in_settings = false;
           prevTime = 0;
         }
+      }
+      else if (is_powerout)
+      {
+        powerout_page(button);
+      }
+      else
+      {
+        status_page(button);
       }
     }
   }
