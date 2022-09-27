@@ -87,6 +87,7 @@ void start_dcdc_control()
     // Timer config for center-aligned PWM
     TIM1->CR1 = TIM_CR1_CMS;
     TIM1->CR2 = 0; // All outputs off when MOE=0.
+    TIM1->DIER = 0;
     TIM1->CCMR1 = 0x6868;
     TIM1->CCMR2 = 0x6068;
     TIM1->CCER = 0x1555;
@@ -112,6 +113,7 @@ void start_dcdc_control()
     TIM3->CCER = TIM_CCER_CC1E;
     TIM3->PSC = STM32_TIMCLK1 / CONTROL_FREQ - 1;
     TIM3->ARR = 1; // Value the timer stops at in one pulse mode
+    TIM3->EGR = TIM_EGR_UG;
     TIM3->CNT = CONTROL_FREQ; // For DC offset calibration
     TIM3->CR1 |= TIM_CR1_CEN;
 

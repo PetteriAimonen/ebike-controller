@@ -57,8 +57,16 @@ void motor_sampling_init()
   palSetPad(GPIOA, GPIOA_DC_CAL);
   
   // Enable TIM1 for sampling at the target rate
-  TIM1->BDTR &= ~ TIM_BDTR_MOE;
+  uint32_t bdtr_old = TIM1->BDTR;
+  uint32_t ccer_old = TIM1->CCER;
+  uint32_t dier_old = TIM1->DIER;
+  TIM1->BDTR = 42;
+  TIM1->DIER = 0;
+  TIM1->CCER = TIM_CCER_CC4E;
+  TIM1->BDTR |= TIM_BDTR_MOE;
+  TIM1->EGR = TIM_EGR_UG;
   TIM1->CR1 |= TIM_CR1_CEN;
+  
   chThdSleepMilliseconds(50);
 
   // Take average of 100 samples
@@ -70,8 +78,13 @@ void motor_sampling_init()
     j1 += ADC1->JDR1;
     j2 += ADC2->JDR1;
   }
+  
   palClearPad(GPIOA, GPIOA_DC_CAL);
+  TIM3->CNT = 0;
   TIM1->CR1 &= ~TIM_CR1_CEN;
+  TIM1->BDTR = bdtr_old;
+  TIM1->CCER = ccer_old;
+  TIM1->DIER = dier_old;
   chThdSleepMilliseconds(5);
   ADC1->JOFR1 = j1/100;
   ADC2->JOFR1 = j2/100;

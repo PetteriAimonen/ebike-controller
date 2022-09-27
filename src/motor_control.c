@@ -200,7 +200,11 @@ void motor_stop()
   g_foc_enabled = false;
   TIM1->BDTR &= ~TIM_BDTR_MOE; // Let the motor freewheel
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
-  TIM3->CCR1 = 100; // Disable EN_GATE so that any fault states get resolved..
+
+  if (palReadPad(GPIOB, GPIOB_FAULT) == 0)
+  {
+    TIM3->CCR1 = 100; // Disable EN_GATE so that any fault states get resolved..
+  }
 }
 
 void start_motor_control()
@@ -219,6 +223,7 @@ void start_motor_control()
   // Timer config for center-aligned PWM
   TIM1->CR1 = TIM_CR1_CMS;
   TIM1->CR2 = 0; // All outputs off when MOE=0.
+  TIM1->DIER = 0;
   TIM1->CCMR1 = 0x6868;
   TIM1->CCMR2 = 0x6068;
   TIM1->CCER = 0x1555;
@@ -226,7 +231,7 @@ void start_motor_control()
   TIM1->PSC = STM32_TIMCLK2 / (2 * PWM_FREQ * PWM_MAX) - 1;
   TIM1->ARR = PWM_MAX - 1;
   TIM1->RCR = (PWM_FREQ * 2) / CONTROL_FREQ - 1;
-  TIM1->BDTR = 84; // 0.5µs dead time
+  TIM1->BDTR = 42; // 0.25µs dead time
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
   TIM1->EGR = TIM_EGR_UG;
   
@@ -248,6 +253,7 @@ void start_motor_control()
   TIM3->CCER = TIM_CCER_CC1E;
   TIM3->PSC = STM32_TIMCLK1 / CONTROL_FREQ - 1;
   TIM3->ARR = 1; // Value the timer stops at in one pulse mode
+  TIM3->EGR = TIM_EGR_UG;
   TIM3->CNT = CONTROL_FREQ; // For DC offset calibration
   TIM3->CR1 |= TIM_CR1_CEN;
   
