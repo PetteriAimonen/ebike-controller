@@ -101,9 +101,16 @@ void update_accel_history()
     count = 0;
     prev_time = time_now;
   
+    // Subtract wheel acceleration to counter the effect where
+    // right at the start of a hill, speed usually drops a bit
+    // which masks the hill from accelerometer.
+    // Clamp large values (braking)
     float wheel_accel = wheel_speed_get_acceleration();
+    if (wheel_accel < -0.1f) wheel_accel = -0.1f;
+    if (wheel_accel > 0.1f) wheel_accel = 0.1f;
+    
     g_prev_pedal_accel = get_pedalling_bandpass();
-    g_prev_hill_accel = get_avg_accel() - (wheel_accel > 0 ? wheel_accel : 0);
+    g_prev_hill_accel = get_avg_accel() - wheel_accel;
   }
 }
 

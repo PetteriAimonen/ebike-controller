@@ -8,8 +8,8 @@
 #include "motor_config.h"
 
 static int g_wheel_tickcount;
+static int g_wheel_sensor_debounce;
 static int g_time_since_rising;
-static int g_time_since_falling;
 static int g_previous_interval;
 static float g_velocity_filtered;
 static bool g_previous_state;
@@ -63,35 +63,37 @@ int wheel_speed_get_tickcount()
 void wheel_speed_update()
 {
   bool state = palReadPad(GPIOC, GPIOC_WHEEL_SPEED);
+  const int threshold = 25;
   
-  if (state && !g_previous_state)
+  if (state && g_wheel_sensor_debounce < threshold)
   {
-    if (g_time_since_falling > 10) // Debounce
-    {
-      // Rising edge
-      for (int i = 5; i > 0; i--)
-      {
-        g_previous_interval_history[i] = g_previous_interval_history[i-1];
-      }
-      
-      g_previous_interval_history[0] = g_previous_interval = g_time_since_rising;
-      g_wheel_tickcount++;
-      g_time_since_rising = 0;
-      g_previous_state = true;
-    }
+    g_wheel_sensor_debounce++;
   }
-  else if (!state && g_previous_state)
+  else if (!state && g_wheel_sensor_debounce > -threshold)
   {
-    if (g_time_since_rising > 10)
-    {
-      // Falling edge
-      g_time_since_falling = 0;
-      g_previous_state = false;
-    }
+    g_wheel_sensor_debounce--;
   }
   
+  if (g_wheel_sensor_debounce >= threshold && !g_previous_state)
+  {
+    // Rising edge
+    for (int i = 5; i > 0; i--)
+    {
+      g_previous_interval_history[i] = g_previous_interval_history[i-1];
+    }
+    
+    g_previous_interval_history[0] = g_previous_interval = g_time_since_rising;
+    g_wheel_tickcount++;
+    g_time_since_rising = 0;
+    g_previous_state = true;
+  }
+  else if (g_wheel_sensor_debounce <= -threshold && g_previous_state)
+  {
+    // Falling edge
+    g_previous_state = false;
+  }
+
   g_time_since_rising++;
-  g_time_since_falling++;
 }
 
 
