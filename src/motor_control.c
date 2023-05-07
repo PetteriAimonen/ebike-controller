@@ -38,6 +38,11 @@ float cabsf(float complex x)
   return sqrtf(i*i + r*r);
 }
 
+static int clamp(int x, int max)
+{
+  return (x < max) ? x : max;
+}
+
 void set_modulation_vector(float complex v)
 {
   // Inverse Clark transform
@@ -55,10 +60,10 @@ void set_modulation_vector(float complex v)
   
   // Convert to integers for PWM
   // Note: CCR1 channel is connected to phase3 and CCR3 to phase1.
-  float scaler = motor_limits_get_max_duty() / f_sqrt3;
-  TIM1->CCR3 = (int)roundf(u1 * scaler);
-  TIM1->CCR2 = (int)roundf(u2 * scaler);
-  TIM1->CCR1 = (int)roundf(u3 * scaler);
+  float scaler = PWM_MAX / f_sqrt3;
+  TIM1->CCR3 = clamp(roundf(u1 * scaler), PWM_MAX_DUTY);
+  TIM1->CCR2 = clamp(roundf(u2 * scaler), PWM_MAX_DUTY);
+  TIM1->CCR1 = clamp(roundf(u3 * scaler), PWM_MAX_DUTY);
 }
 
 void set_motor_pwm(int angle, int duty)
@@ -95,7 +100,7 @@ static void do_field_oriented_control(bool do_modulation)
   // Do PI control to match the requested torque
   // Current varies from 0..MAX_MOTOR_CURRENT.
   // The voltage vector length varies 0..1
-  float complex reference = I * g_foc_torque_current;
+  float complex reference = I * g_foc_torque_current * motor_limits_get_fraction();
   float complex error = reference - current;
   g_foc_I_accumulator += FOC_I_TERM * error;
   float complex voltage = reference + FOC_P_TERM * error + g_foc_I_accumulator;
@@ -133,7 +138,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
   motor_orientation_update();
   motor_sampling_update();
   motor_sampling_store();
-  motor_limits_update_max_duty();
+  motor_limits_update();
   
   if ((TIM1->BDTR & TIM_BDTR_MOE) == 0)
   {

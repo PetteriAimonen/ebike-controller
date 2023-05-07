@@ -257,7 +257,8 @@ static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "Wheel distance:       %8d m\r\n",  wheel_speed_get_distance());
   chprintf(chp, "Acceleration:         %8d mg\r\n", bike_control_get_acceleration());
   chprintf(chp, "Motor target current: %8d mA\r\n", bike_control_get_motor_current());
-  chprintf(chp, "Motor max duty:       %8d\r\n",    motor_limits_get_max_duty());
+  chprintf(chp, "Motor max power:      %8d %%\r\n", (int)(motor_limits_get_fraction() * 100));
+  chprintf(chp, "Motor angle:          %8d deg, HALL %4d\r\n", motor_orientation_get_angle(), motor_orientation_get_hall_angle());
   
   int p1, p3;
   motor_get_currents(&p1, &p3);
