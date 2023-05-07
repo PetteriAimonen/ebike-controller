@@ -9,7 +9,7 @@
 
 // PWM period, should be selected so that 168MHz / PWM_FREQ divides nicely.
 #define PWM_MAX  840
-#define PWM_MAX_DUTY 700
+#define PWM_MAX_DUTY 780
 // Shunt resistance
 #define SHUNT_uA_PER_ADC_VAL 16113
 
@@ -21,16 +21,22 @@
 #define DUTY_LIMIT_FILTER_S   5.0f
 
 // Field oriented control PI loop terms
-#define FOC_P_TERM 0.5f
+#define FOC_P_TERM 0.1f
 #define FOC_I_TERM 0.05f
 
 // Distance in meters per one wheel speed sensor tick.
+// Wheel to motor gear ratio is 1:46
 #define WHEEL_SPEED_STEP (2.17f/6)
+
+// Maximum and minimum RPM for motor control purposes
+// Motor speed is assumed to be unknown if it is outside these limits
+#define CTRL_MIN_RPM 100
+#define CTRL_MAX_RPM 20000
 
 // Maximum motor speed, temperatures and minimum battery voltage
 // For each, A point gives the start of the linear duty lowering,
 // and B point is where the duty drops to 0%.
-#define MOTOR_MAX_RPM_A         7800
+#define MOTOR_MAX_RPM_A         8500
 #define MOTOR_MAX_RPM_B         10000
 #define MOTOR_MAX_TEMP_A          50000
 #define MOTOR_MAX_TEMP_B          70000
@@ -44,7 +50,7 @@
 // Bike control parameters
 #define MOTOR_NEWTON_PER_A         5.0f
 #define BIKE_WEIGHT_KG           100.0f
-#define BIKE_MIN_VELOCITY          0.5f
+#define BIKE_MIN_VELOCITY          0.2f
 #define BIKE_MAX_VELOCITY          7.5f
 #define BIKE_BRAKE_THRESHOLD_M_S2  1.0f
 #define BIKE_BRAKE_THRESHOLD_B_M_S2  5.0f
