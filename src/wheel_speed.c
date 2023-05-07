@@ -38,6 +38,8 @@ float wheel_speed_get_velocity()
 float wheel_speed_get_acceleration()
 {
   float sum_accel = 0.0f;
+  float min = 99999.0f;
+  float max = -99999.0f;
   for (int i = 0; i < 5; i++)
   {
     float speed1 = interval_to_velocity(g_previous_interval_history[i]);
@@ -45,8 +47,15 @@ float wheel_speed_get_acceleration()
     float time = (g_previous_interval_history[i] + g_previous_interval_history[i + 1]) / (2.0f * CONTROL_FREQ);
     float accel = (time > 0.01f) ? ((speed1 - speed2) / time) : 0.0f;
     sum_accel += accel;
+
+    if (min > accel) min = accel;
+    if (max < accel) max = accel;
   }
   
+  // Discard min and max values for outliers
+  sum_accel -= min;
+  sum_accel -= max;
+
   return sum_accel / 5.0f;
 }
 
