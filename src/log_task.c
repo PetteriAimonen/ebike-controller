@@ -16,7 +16,7 @@ volatile system_state_t g_system_state = {
   .accelerometer_bias_mg = 0,
   .min_voltage_V = 33,
   .max_motor_current_A = 15,
-  .max_battery_current_A = 12
+  .max_battery_current_A = 9
 };
 
 static uint8_t g_logbuffer1[4096];
@@ -66,9 +66,9 @@ void log_saver_thread(void *p)
   FIL file;
   f_open(&file, filename, FA_WRITE | FA_CREATE_NEW);
   
-  static const char header[] = "# SysTime    Dist.     Vel.    WAcc.    BattU    BattI    Tmosfet     RPM     Duty"
-                               "   Accel  Current    State   Clicks   HillA    PedalA\r\n"
-                               "#      ms       m      mm/s   mm^2/s       mV       mA         mC     rpm      pwm"
+  static const char header[] = "# SysTime    Dist.     Vel.    WAcc.    BattU    BattI    Tmosfet     RPM     Limit"
+                               "  Accel  Current    State   Clicks   HillA    PedalA\r\n"
+                               "#      ms       m      mm/s   mm^2/s       mV       mA         mC     rpm      %% "
                                "   mm/s^2        mA                   mm/s^2   mm/s^2\r\n";
   f_write(&file, header, sizeof(header) - 1, &bytes_written);
   
@@ -125,7 +125,7 @@ void log_writer_thread(void *p)
               chVTGetSystemTime(),
               wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
               get_battery_voltage_mV(), get_battery_current_mA(),
-              get_mosfet_temperature_mC(), motor_orientation_get_fast_rpm(), motor_limits_get_max_duty(),
+              get_mosfet_temperature_mC(), motor_orientation_get_fast_rpm(), (int)(100*motor_limits_get_fraction()),
               bike_control_get_acceleration(), bike_control_get_motor_current(),
               bike_control_get_state(), ui_get_ok_button_clicks(), bike_control_get_hill_accel(), bike_control_get_pedal_accel());
 

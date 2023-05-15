@@ -202,6 +202,7 @@ void motor_run(int torque_current_mA, int advance_deg)
 void motor_stop()
 {
   g_foc_torque_current = 0;
+  g_foc_I_accumulator = 0.0f;
   g_foc_enabled = false;
   TIM1->BDTR &= ~TIM_BDTR_MOE; // Let the motor freewheel
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;

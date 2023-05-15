@@ -27,6 +27,11 @@ static int g_brake_pos;
 
 const char* bike_control_get_state()
 {
+  if (palReadPad(GPIOB, GPIOB_FAULT) == 0)
+  {
+    return "DRV_FAULT";
+  }
+
   const char *states[] = {"BOOT", "BRAKING", "WAITMOVE", "POWERED"};
   return states[g_bike_state];
 }
