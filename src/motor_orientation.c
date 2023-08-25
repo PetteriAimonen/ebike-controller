@@ -6,13 +6,29 @@
 #include "motor_config.h"
 #include "motor_orientation.h"
 
-static uint32_t g_motor_total_steps;
-static int g_motor_prev_sector;
-static uint32_t g_motor_timestamp;
-static uint32_t g_motor_sector_times[6];
-static uint32_t g_motor_sector_counts[6];
-static int g_hall_error_count;
 static float g_motor_filtered_rpm;
+
+static struct {
+  uint32_t tickcount;       // Running tick count incremented at CONTROL_FREQ
+  int prev_sector;          // Previous accepted hall sector value
+  uint32_t prev_time;       // Time when sector last changed
+  uint32_t update_time;     // Time when the new sector was accepted to prev_sector
+  int prev_angle;           // Angle at previous sector boundary
+  int prev_estimate;        // Angle estimate in effect at update_time
+  int prev_direction;       // Rotation direction at last sector change
+  int pending_sector;       // Current hall sector value pending glitch filter
+  uint32_t pending_time;    // Time when pending_sector last changed
+
+  uint32_t last_reversal;   // Last time motor direction changed
+
+  bool valid;               // True if motor is rotating steadily
+
+  int ticks_per_sector;     // Ticks elapsed during last hall sector
+  int ticks_per_sector_2;   // Ticks elapsed during second to last sector
+} g_hall;
+
+// From main.c, whether motor is connected
+extern bool g_have_motor;
 
 // Table index is H3 | H2 | H1, value is sector 1-6.
 // Typical rotation is:
@@ -25,6 +41,11 @@ static float g_motor_filtered_rpm;
 // 101=5    6
 //const int g_hall_table[8] = {-2, 0, 2, 1, 4, 5, 3, -1};
 const int g_hall_table[8] = {-2, 5, 3, 4, 1, 0, 2, -1};
+
+static int wrap_angle(int a)
+{
+  return (a + 3600) % 360;
+}
 
 static int angle_diff(int a, int b)
 {
@@ -44,47 +65,84 @@ int motor_orientation_get_hall_sector()
   return g_hall_table[hall_state];
 }
 
-static int sector_to_angle(float sector)
+static int sector_to_angle(int sector)
 {
-  int hall_angle = sector * 60;
-  hall_angle = (hall_angle + HALL_OFFSET + 720) % 360;
-  return hall_angle;
+  return wrap_angle((int)(sector * 60) + HALL_OFFSET);
 }
-
-extern bool g_have_motor;
 
 void motor_orientation_update()
 {
-  g_motor_timestamp++;
+  g_hall.tickcount++;
 
+  // Check if hall input values have changed
   int sector = motor_orientation_get_hall_sector();
-  
-  if (sector < 0)
+  if (sector != g_hall.pending_sector)
   {
-    g_hall_error_count++;
+    g_hall.pending_sector = sector;
+    g_hall.pending_time = g_hall.tickcount;
+  }
+
+  // Detect hall sensor failure
+  uint32_t ticks_pending = (uint32_t)(g_hall.tickcount - g_hall.pending_time);
+  if (g_hall.pending_sector < 0 && ticks_pending > HALL_TIMEOUT)
+  {
+    g_motor_filtered_rpm = 0;
+    g_hall.valid = false;
+  }
+
+  // Filter for short glitches and detect sector change
+  if (g_hall.pending_sector >= 0 &&
+      g_hall.pending_sector != g_hall.prev_sector &&
+      ticks_pending > HALL_FILTER)
+  {
+    g_hall.prev_estimate = motor_orientation_get_angle();
     
-    if (g_hall_error_count > 500)
+    // Figure out number of steps between sectors
+    int delta = g_hall.pending_sector - g_hall.prev_sector;
+    if (delta < -3) delta += 6;
+    if (delta > 3) delta -= 6;
+
+    // Check rotation direction and the angle at sector boundary
+    if (delta > 0)
     {
-        g_motor_filtered_rpm = 0;
+      g_hall.prev_direction = 1;
+      g_hall.prev_angle = sector_to_angle(g_hall.pending_sector);
     }
-    return;
+    else
+    {
+      if (g_hall.prev_direction > 0 && g_hall.valid)
+      {
+        g_hall.last_reversal = g_hall.tickcount;
+      }
+
+      g_hall.prev_direction = -1;
+      g_hall.prev_angle = sector_to_angle(g_hall.prev_sector);
+    }
+    
+    // Update state variables
+    g_hall.update_time = g_hall.tickcount;
+    g_hall.ticks_per_sector_2 = g_hall.ticks_per_sector;
+    g_hall.ticks_per_sector = g_hall.pending_time - g_hall.prev_time;
+    g_hall.prev_sector = g_hall.pending_sector;
+    g_hall.prev_time = g_hall.pending_time;
+  }
+
+  // Detect when we are synced to rotation
+  uint32_t max_ticks_per_sector = (60 * CONTROL_FREQ) / CTRL_MIN_RPM;
+  uint32_t min_ticks_per_sector = (60 * CONTROL_FREQ) / CTRL_MAX_RPM;
+  uint32_t time_since_reversal = g_hall.tickcount - g_hall.last_reversal;
+  if (ticks_pending <= max_ticks_per_sector &&
+      g_hall.ticks_per_sector >= min_ticks_per_sector &&
+      g_hall.ticks_per_sector <= max_ticks_per_sector &&
+      g_hall.ticks_per_sector <= g_hall.ticks_per_sector_2 * 2 &&
+      g_hall.ticks_per_sector >= g_hall.ticks_per_sector_2 / 2 &&
+      time_since_reversal > CONTROL_FREQ * HALL_BACKOFF_MS / 1000)
+  {
+    g_hall.valid = true;
   }
   else
   {
-    g_hall_error_count = 0;
-  }
-  
-  int delta = sector - g_motor_prev_sector;
-  if (delta != 0)
-  {
-    g_motor_prev_sector = sector;
-
-    if (delta > 3) delta -= 6;
-    if (delta <= -3) delta += 6;
-    g_motor_total_steps += delta;
-
-    g_motor_sector_times[sector] = g_motor_timestamp;
-    g_motor_sector_counts[sector] = g_motor_total_steps;
+    g_hall.valid = false;
   }
 
   // Filter the motor RPM estimate for less speed critical uses
@@ -93,127 +151,89 @@ void motor_orientation_update()
   g_motor_filtered_rpm = g_motor_filtered_rpm * (1 - decay) + rpm * decay;
 }
 
-// Based on g_motor_sector_times, fit a linear function:
-// f(t) = a * t + b
-// which gives the motor sector as function of t, which is
-// the time delta relative to reftime.
-static inline void motor_angle_linear_fit(float *a, float *b, uint32_t reftime)
-{
-  // Simple linear regression with
-  // X = time delta, Y = motor sector
-  uint32_t refsteps = g_motor_sector_counts[0];
-  float sum_x = 0.0f;
-  float sum_y = 0.0f;
-  float sum_x2 = 0.0f;
-  float sum_y2 = 0.0f;
-  float sum_xy = 0.0f;
-  for (int i = 0; i < 6; i++)
-  {
-    float x = (int32_t)(g_motor_sector_times[i] - reftime);
-    float y = (int32_t)(g_motor_sector_counts[i] - refsteps);
-    sum_x += x;
-    sum_y += y;
-    sum_x2 += x * x;
-    sum_y2 += y * y;
-    sum_xy += x * y;
-  }
-
-  float x_mean = sum_x / 6;
-  float y_mean = sum_y / 6;
-  float x_var = sum_x2 / 6 - x_mean * x_mean;
-  float cov = sum_xy / 6 - x_mean * y_mean;
-  *a = cov / x_var;
-  *b = y_mean - (*a) * x_mean;
-}
-
-bool motor_spinning()
-{
-  uint32_t last_time = g_motor_sector_times[g_motor_prev_sector];
-  uint32_t max_ticks_per_rotation = (60 * CONTROL_FREQ) / CTRL_MIN_RPM;
-  return (uint32_t)(g_motor_timestamp - last_time) < max_ticks_per_rotation;
-}
-
-bool motor_orientation_in_sync()
-{
-  // Check that all sectors have received timestamps recently
-  uint32_t max_ticks_per_rotation = (60 * CONTROL_FREQ) / CTRL_MIN_RPM;
-  for (int i = 0; i < 6; i++)
-  {
-    uint32_t delta = (uint32_t)(g_motor_timestamp - g_motor_sector_times[i]);
-    if (delta > max_ticks_per_rotation) return false;
-  }
-  
-  return true;
-}
-
 int motor_orientation_get_angle()
 {
-  if (!motor_orientation_in_sync())
+  // Skip interpolation if we are not synchronized to rotation yet
+  if (!g_hall.valid)
   {
     return motor_orientation_get_hall_angle();
   }
 
-  float a, b;
-  uint32_t t = g_motor_timestamp;
-  motor_angle_linear_fit(&a, &b, t);
-
-  int hall_angle = motor_orientation_get_hall_angle();
-  float limit = CTRL_MAX_RPM * 6 / (60.0f * CONTROL_FREQ);
-  if (a > -limit && a < limit && b > -6 && b < 12)
+  // At each sector change, we get a new estimate for motor speed
+  // and a new instant angle value. To avoid any sudden jumps,
+  // linearly interpolate between the angle value reported at the
+  // previous update and our best estimate for the time when current
+  // sector will end.
+  int ticks_per_sector = (g_hall.ticks_per_sector + g_hall.ticks_per_sector_2) / 2;
+  uint32_t sector_end_time = g_hall.prev_time + ticks_per_sector;
+  int32_t time_to_sector_end = (int32_t)(sector_end_time - g_hall.tickcount);
+  int32_t sector_total_time = (int32_t)(sector_end_time - g_hall.update_time);
+  
+  if (time_to_sector_end >= 0)
   {
-    int angle = sector_to_angle(b);
-    int diff = angle_diff(angle, hall_angle);
-    if (diff > 40)
-      angle = hall_angle + 40;
-    else if (diff < -40)
-      angle = hall_angle - 40;
-    
-    if (angle < 0) angle += 360;
-    if (angle >= 360) angle -= 360;
-    
-    return angle;
+    // Interpolate from previous estimate to new estimate
+    int next_angle = g_hall.prev_angle + g_hall.prev_direction * 60;
+    int delta = angle_diff(g_hall.prev_estimate, next_angle);
+    int delta_to_apply = delta * time_to_sector_end / sector_total_time;
+    return wrap_angle(next_angle + delta_to_apply);
+  }
+  else if (time_to_sector_end > -ticks_per_sector / 4)
+  {
+    // Extrapolate up to 15 deg into next sector
+    int next_angle = g_hall.prev_angle + g_hall.prev_direction * 60;
+    int extra_angle = 60 * (-time_to_sector_end) / ticks_per_sector;
+    return wrap_angle(next_angle + extra_angle * g_hall.prev_direction);
   }
   else
   {
-    // Linear fit is clearly wrong
-    return hall_angle;
+    // Hold the estimate, motor is probably stalled
+    int next_angle = g_hall.prev_angle + g_hall.prev_direction * 60;
+    return wrap_angle(next_angle + 15 * g_hall.prev_direction);
   }
 }
 
 int motor_orientation_get_hall_angle()
 {
-  return sector_to_angle(g_motor_prev_sector + 0.5f);
+  return wrap_angle(sector_to_angle(g_hall.prev_sector) + 30);
 }
 
 int motor_orientation_get_fast_rpm()
 {
-  if (!motor_spinning())
+  uint32_t max_ticks_per_sector = (60 * CONTROL_FREQ) / CTRL_MIN_RPM;
+  uint32_t latest_ticks = (g_hall.tickcount - g_hall.update_time);
+  int ticks_per_sector = (g_hall.ticks_per_sector + g_hall.ticks_per_sector_2) / 2;
+  
+  if (latest_ticks > max_ticks_per_sector)
   {
     return 0;
   }
-
-  float a, b;
-  uint32_t t = g_motor_timestamp;
-  motor_angle_linear_fit(&a, &b, t);
-  float deg_per_sector = 60.0f;
-  float rpm = a * (deg_per_sector * 60.0f * CONTROL_FREQ / 360.0f);
-
-  if (rpm > -CTRL_MAX_RPM && rpm < CTRL_MAX_RPM)
+  else if (latest_ticks > ticks_per_sector)
   {
-    return rpm;
+    ticks_per_sector = latest_ticks;
+  }
+
+  float rpm = 10.0f * CONTROL_FREQ / ticks_per_sector * g_hall.prev_direction;
+
+  if (rpm < -CTRL_MAX_RPM)
+  {
+    return -CTRL_MAX_RPM;
+  }
+  else if (rpm > CTRL_MAX_RPM)
+  {
+    return CTRL_MAX_RPM;
   }
   else
   {
-    return 0;
+    return rpm;
   }
 }
 
 int motor_orientation_get_rpm()
 {
-  if (!motor_spinning())
-  {
-    return 0;
-  }
-
   return (int)g_motor_filtered_rpm;
+}
+
+bool motor_orientation_in_sync()
+{
+  return g_hall.valid;
 }

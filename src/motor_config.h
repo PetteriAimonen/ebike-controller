@@ -3,6 +3,16 @@
 // Angle offset for hall sensors (degrees)
 #define HALL_OFFSET 210
 
+// Glitch filter count for hall sensors (number of samples)
+#define HALL_FILTER 5
+
+// Timeout for invalid hall sensor readings
+#define HALL_TIMEOUT 500
+
+// Backoff time after a lost sync.
+// 6-step commutation is used during this time.
+#define HALL_BACKOFF_MS 1000
+
 // Base frequency for PWM and control loop.
 #define PWM_FREQ 25000
 #define CONTROL_FREQ 10000
