@@ -52,6 +52,7 @@ int main(void)
 {
     halInit();
     chSysInit();
+    ws2812_init();
     shellInit();
 
     start_bluetooth_shell();
@@ -59,6 +60,14 @@ int main(void)
     filesystem_init();
     sensors_start();
     ui_start();
+
+    // Bootup animation
+    for (int i = 0; i < 27; i++)
+    {
+      ws2812_write_led(26 - i, 64, 0, 0);
+      ws2812_write_led(27 + i, 64, 0, 0);
+      chThdSleepMilliseconds(25);
+    }
     
     g_have_motor = (motor_orientation_get_hall_sector() >= 0);
     
@@ -95,5 +104,7 @@ int main(void)
         chThdSleepMilliseconds(500);
         palSetPad(GPIOC, GPIOC_LED_GREEN);
         chThdSleepMilliseconds(500);
+        
+        check_usb_usart();
     }
 }

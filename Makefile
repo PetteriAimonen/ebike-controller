@@ -34,6 +34,9 @@ PROJECT_CSRC += src/filesystem.c src/log_task.c
 # Motion control
 PROJECT_CSRC += src/bike_control_task.c
 
+# WS2812 LED driver
+PROJECT_CSRC += src/ws2812.c
+
 # OLED screen
 PROJECT_CSRC += src/ui_task.c
 PROJECT_CSRC += u8glib/u8g_ll_api.c u8glib/u8g_com_api.c u8glib/u8g_state.c
