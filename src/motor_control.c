@@ -230,6 +230,9 @@ void motor_stop()
   if (palReadPad(GPIOB, GPIOB_FAULT) == 0)
   {
     TIM3->CCR1 = 100; // Disable EN_GATE so that any fault states get resolved..
+    chThdSleepMilliseconds(10);
+    TIM3->CCR1 = 1;
+    chThdSleepMilliseconds(10);
   }
 }
 

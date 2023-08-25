@@ -161,6 +161,7 @@ void motor_sampling_update()
   motor_get_currents(&i1, &i3);
   int i2 = -(i1 + i3);
   float mA = i1 * ph1 + i2 * ph2 + i3 * ph3;
+  if (mA < -20000) mA = 0; // Fault state disables current reading
   g_battery_current = g_battery_current * (1 - decay) + mA * decay;
   
   /* Estimate MOSFET temperature */
