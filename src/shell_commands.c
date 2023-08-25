@@ -134,33 +134,89 @@ static void cmd_motor_rotate(BaseSequentialStream *chp, int argc, char *argv[])
                angle, motor_orientation_get_angle(), motor_orientation_get_fast_rpm(), motor_orientation_get_hall_angle());
     chSequentialStreamWrite(chp, (void*)buf, strlen(buf));
   } while (argc > 0 && b != Q_RESET && b != '\r');
+
+  motor_stop();
 }
 
 static void cmd_motor_run(BaseSequentialStream *chp, int argc, char *argv[])
 {
-  if (argc < 2)
+  if (argc < 1)
   {
-    chprintf(chp, "Usage: motor_run <torque_mA> <advance_deg>\r\n");
+    chprintf(chp, "Usage: motor_run rpm [torque_mA] [advance_deg]\r\n");
     return;
   }
+
+  int target_rpm = atoi(argv[0]);
+  int torque_mA = 1000;
+  int advance = 0;
+
+  if (argc >= 2)
+  {
+    torque_mA = atoi(argv[1]);
+  }
+
+  if (argc >= 3)
+  {
+    advance = atoi(argv[2]);
+  }
   
-  int torque_mA = atoi(argv[0]);
-  int advance = atoi(argv[1]);
-  
+  chprintf(chp, "Running at %d RPM, using max %d mA torque current\r\n", target_rpm, torque_mA);
+
+  // Start with max current
   motor_run(torque_mA, advance);
+
+  // PID controller to maintain speed
+  float prev_error = 0.0f;
+  float error_I = 0.0f;
+  float cP = 0.2f;
+  float cI = 0.02f;
+  float cD = 0.1f;
+
+  if (argc >= 6)
+  {
+    cP = atoi(argv[3]) / 100.0f;
+    cI = atoi(argv[4]) / 100.0f;
+    cD = atoi(argv[5]) / 100.0f;
+  }
   
   int b = 0;
   int i = 0;
+  
+  systime_t start = chVTGetSystemTime();
+
+  uint32_t cnt = 0;
   do {
     // End if enter is pressed
-    b = chnGetTimeout((BaseChannel*)chp, MS2ST(100));    
+    b = chnGetTimeout((BaseChannel*)chp, MS2ST(10));
+    cnt++;
     
-    chprintf(chp, "%6d %6d RPM, %6d mV, %6d mA, %6d Tmotor, %6d Tmosfet, %d ticks\r\n",
-             i++, motor_orientation_get_fast_rpm(), get_battery_voltage_mV(), get_battery_current_mA(),
-             get_motor_temperature_mC() / 1000, get_mosfet_temperature_mC() / 1000,
-             motor_get_interrupt_time()
-            );
+    int rpm = motor_orientation_get_fast_rpm();
+
+    // Do PID control to maintain speed
+    
+    float error = target_rpm - rpm;
+    error_I += error * cI;
+    if (error_I < -torque_mA) error_I = -torque_mA;
+    if (error_I > torque_mA) error_I = torque_mA;
+    float current = cP * error + error_I + cD * (error - prev_error);
+    prev_error = error;
+    if (current > torque_mA) current = torque_mA;
+    if (current < -torque_mA) current = -torque_mA;
+    int current_mA = current;
+    motor_run(current_mA, advance);
+
+    if (cnt % 10 == 0)
+    {
+      chprintf(chp, "%6d ms, command %6d mA, %6d RPM, Battery: %6d mV, %6d mA, Tmosfet: %6d C, IrqTime: %d ticks\r\n",
+              chVTGetSystemTime() - start,
+              current_mA, rpm, get_battery_voltage_mV(), get_battery_current_mA(),
+              get_mosfet_temperature_mC() / 1000,
+              motor_get_interrupt_time()
+              );
+    }
   } while (argc > 0 && b != Q_RESET && b != '\r');
+
+  motor_stop();
 }
 
 static void cmd_motor_samples(BaseSequentialStream *chp, int argc, char *argv[])

@@ -1,0 +1,55 @@
+# Utility functions for accessing the ARMv7-M DWT module.
+# Allows instructions timings etc.
+
+# Enable the DWT module
+define dwt_enable
+  # CYCCNT
+  set *(uint32_t*)0xe0001000 |= (1 << 0)
+  
+  # CPI
+  set *(uint32_t*)0xe0001000 |= (1 << 17)
+  
+  # Exception overhead
+  set *(uint32_t*)0xe0001000 |= (1 << 18)
+  
+  # Sleep count
+  set *(uint32_t*)0xe0001000 |= (1 << 19)
+  
+  # LSU count
+  set *(uint32_t*)0xe0001000 |= (1 << 20)
+  
+  # Folded instructions
+  set *(uint32_t*)0xe0001000 |= (1 << 21)
+end
+
+# Reset the counters
+define dwt_reset
+  set *(uint32_t*)0xe0001000 = 0
+  set *(uint32_t*)0xe0001004 = 0
+  dwt_enable
+end
+
+# Print total CPU cycle count
+define dwt_cyccnt
+  p *(uint32_t*)0xe0001004
+end
+
+# Print number of clocks spent on exception stacking/unstacking
+define dwt_exccnt
+  p *(uint32_t*)0xe000100c
+end
+
+# Print number of clocks spent in sleep (WFI/WFE)
+define dwt_sleepcnt
+  p *(uint32_t*)0xe0001010
+end
+
+# Print extra cycles spent waiting for load/store
+define dwt_lsucnt
+  p *(uint32_t*)0xe0001014
+end
+
+# Print folded instructions count (instructions that take 0 cycles)
+define dwt_foldcnt
+  p *(uint32_t*)0xe0001018
+end

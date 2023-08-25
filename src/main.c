@@ -13,28 +13,38 @@
 #include "bike_control_task.h"
 #include "ui_task.h"
 #include "debug.h"
+#include "ws2812.h"
 
 void enable_trace()
 {
   // Enable SWO trace
   DBGMCU->CR |= DBGMCU_CR_TRACE_IOEN; // Enable IO trace pins
   
+  if (!(DBGMCU->CR & DBGMCU_CR_TRACE_IOEN))
+  {
+      // Some (all?) STM32s don't allow writes to DBGMCU register until
+      // C_DEBUGEN in CoreDebug->DHCSR is set. This cannot be set by the
+      // CPU itself, so in practice you need to connect to the CPU with
+      // a debugger once before resetting it.
+      return;
+  }
+
   /* Configure Trace Port Interface Unit */
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // Enable access to registers
-  TPI->ACPR = 20; // Trace clock = HCLK/(x+1) = 8MHz
-  TPI->SPPR = 2; // Pin protocol = NRZ/USART
+  TPI->ACPR = 1; // Trace clock = HCLK/(x+1) = 84MHz
+  TPI->SPPR = 1; // Pin protocol = Manchester
   TPI->FFCR = 0x100; // ITM trace only
   
   /* Configure PC sampling and exception trace  */
   DWT->CTRL = (1 << DWT_CTRL_CYCTAP_Pos) // Prescaler for PC sampling
                                           // 0 = x32, 1 = x512
-            | (3 << DWT_CTRL_POSTPRESET_Pos) // Postscaler for PC sampling
+            | (7 << DWT_CTRL_POSTPRESET_Pos) // Postscaler for PC sampling
                                               // Divider = value + 1
             | (1 << DWT_CTRL_PCSAMPLENA_Pos) // Enable PC sampling
-            | (2 << DWT_CTRL_SYNCTAP_Pos)    // Sync packet interval
+            | (0 << DWT_CTRL_SYNCTAP_Pos)    // Sync packet interval
                                               // 0 = Off, 1 = Every 2^23 cycles,
                                               // 2 = Every 2^25, 3 = Every 2^27
-            | (1 << DWT_CTRL_EXCTRCENA_Pos)  // Enable exception trace
+            | (0 << DWT_CTRL_EXCTRCENA_Pos)  // Enable exception trace
             | (1 << DWT_CTRL_CYCCNTENA_Pos); // Enable cycle counter
             
   /* Configure instrumentation trace macroblock */
@@ -91,7 +101,7 @@ int main(void)
       motor_sampling_init(); // For battery voltage
     }
     
-//     enable_trace();
+    enable_trace();
     
     while (true)
     {

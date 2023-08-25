@@ -82,8 +82,14 @@ float complex get_current_vector()
   float phase1_A = phase1_mA;
   float phase3_A = phase3_mA;
   float phase2_A = -(phase1_A + phase3_A);
+
+  ITM->PORT[ITM_CURRENT_PH1].u16 = (uint16_t)(int16_t)phase1_mA;
+  ITM->PORT[ITM_CURRENT_PH3].u16 = (uint16_t)(int16_t)phase3_mA;
   
-  return (f_v1 * phase1_A + f_v2 * phase2_A + f_v3 * phase3_A) / 2.0f;
+  float complex current = (f_v1 * phase1_A + f_v2 * phase2_A + f_v3 * phase3_A) / 2.0f;
+  // ITM->PORT[ITM_IVECTOR_R].u16 = (int16_t)(crealf(current));
+  // ITM->PORT[ITM_IVECTOR_I].u16 = (int16_t)(cimagf(current));
+  return current;
 }
 
 static void do_field_oriented_control(bool do_modulation)
@@ -96,6 +102,13 @@ static void do_field_oriented_control(bool do_modulation)
   float complex current = get_current_vector();
   current *= conjf(rotor_vector);
   g_debug_latest_I_vector = current;
+  
+  // Report input data over SWO pin
+  // ITM->PORT[ITM_BATTVOLTAGE].u16 = get_battery_voltage_mV();
+  ITM->PORT[ITM_ORIENTATION].u16 = motor_orientation_get_angle();
+  ITM->PORT[ITM_HALLSECTOR].u8 = motor_orientation_get_hall_sector();
+  // ITM->PORT[ITM_TARGETCURRENT].u16 = g_foc_torque_current;
+
   
   // Do PI control to match the requested torque
   // Current varies from 0..MAX_MOTOR_CURRENT.
@@ -128,6 +141,13 @@ static void do_field_oriented_control(bool do_modulation)
     voltage *= rotor_vector;
     set_modulation_vector(voltage);
   }
+
+  // Report results over SWO pin for debugging
+  ITM->PORT[ITM_PWM_CCR1].u16 = TIM1->CCR1;
+  ITM->PORT[ITM_PWM_CCR2].u16 = TIM1->CCR2;
+  ITM->PORT[ITM_PWM_CCR3].u16 = TIM1->CCR3;
+  ITM->PORT[ITM_UVECTOR_R].u16 = (int16_t)(crealf(voltage) * 16384.0f);
+  ITM->PORT[ITM_UVECTOR_I].u16 = (int16_t)(cimagf(voltage) * 16384.0f);
 }
 
 CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)

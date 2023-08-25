@@ -18,6 +18,7 @@ PROJECT_CSRC += src/main.c src/board.c src/debug.c
 
 # Shell
 PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_commands.c
+USE_OPT += -DSHELL_MAX_ARGUMENTS=6
 
 # Motor control
 PROJECT_CSRC += src/motor_control.c src/motor_orientation.c src/motor_sampling.c src/motor_limits.c
@@ -67,6 +68,14 @@ debug:
 debugraw:
 	$(GDB) -iex 'target extended | $(OOCD) -d1 $(OOCDFLAGS) \
 		-c "gdb_port pipe"' -iex 'mon halt' -ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
+
+debug_orbtrace:
+	$(GDB) -iex 'target extended | $(OOCD) -d1 -f interface/cmsis-dap.cfg -f target/stm32f4x.cfg -c "stm32f4x.cpu configure -rtos auto;" \
+		-c "gdb_port pipe"' -iex 'mon halt' \
+		-ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
+
+program_dfu: $(BUILDDIR)/$(PROJECT).bin
+	dfu-util -D $< -a 0 --dfuse-address 0x08000000
 
 %.o: %.c
     # Just to make kdevelop include path discovery work.
