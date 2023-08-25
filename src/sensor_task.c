@@ -49,7 +49,8 @@ static void sensor_thread(void *p)
   lsm6ds3_write(LSM6DS3_CTRL3_C, 0x08);
   lsm6ds3_write(LSM6DS3_CTRL4_C, 0x04);
   
-  if (lsm6ds3_read(LSM6DS3_WHOAMI) != 0x69)
+  uint8_t id = lsm6ds3_read(LSM6DS3_WHOAMI);
+  if (id != 0x69 && id != 0x6A)
     abort_with_error("ACCEL_FAIL");
   
   // Configure accelerometer
