@@ -9,6 +9,7 @@
 #include "sensor_task.h"
 #include "ui_task.h"
 #include "log_task.h"
+#include "ws2812.h"
 
 static THD_WORKING_AREA(bikestack, 1024);
 
@@ -315,6 +316,68 @@ static void state_powered()
   }
 }
 
+static void update_leds()
+{
+  static int brake_time = 0;
+
+  if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
+  {
+    brake_time++;
+
+    if (brake_time < 200)
+    {
+      for (int i = 0; i < 54; i++)
+      {
+        // Brake lights
+        ws2812_write_led(i, 255, 0, 0);
+      }
+    }
+    else
+    {
+      for (int i = 0; i < 54; i++)
+      {
+        // Dimmer brake lights
+        ws2812_write_led(i, 64, 0, 0);
+      }
+    }
+  }
+  else
+  {
+    brake_time = 0;
+
+    // Rear end lights
+    for (int i = 0; i < 17; i++)
+    {
+      if (i & 1)
+      {
+        ws2812_write_led(26 - i, 64, 0, 0);
+        ws2812_write_led(27 + i, 64, 0, 0);
+      }
+      else
+      {
+        ws2812_write_led(26 - i, 0, 0, 0);
+        ws2812_write_led(27 + i, 0, 0, 0);
+      }
+    }
+
+    // Power level indicator lights
+    float ratio = g_motor_current / g_system_state.max_motor_current_A;
+    for (int i = 0; i < 10; i++)
+    {
+      if (ratio > i * 0.1f)
+      {
+        ws2812_write_led(26 - 17 - i, 64, 64, 0);
+        ws2812_write_led(27 + 17 + i, 64, 64, 0);
+      }
+      else
+      {
+        ws2812_write_led(26 - 17 - i, 0, 0, 0);
+        ws2812_write_led(27 + 17 + i, 0, 0, 0);
+      }
+    }
+  }
+}
+
 
 static void bike_control_thread(void *p)
 {
@@ -396,6 +459,8 @@ static void bike_control_thread(void *p)
       was_stopped = true;
       motor_stop();
     }
+
+    update_leds();
   }
 }
 

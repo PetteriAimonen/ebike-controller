@@ -85,7 +85,7 @@
 /* --- PRIVATE CONSTANTS ---------------------------------------------------- */
 
 #define WS2812_PWM_FREQUENCY    (STM32_SYSCLK/2)                /**< Clock frequency of PWM, must be valid with respect to system clock! */
-#define WS2812_PWM_PERIOD       (WS2812_PWM_FREQUENCY/625000)   /**< Clock period in ticks. 1 / 625kHz = 1.6 uS */
+#define WS2812_PWM_PERIOD       (WS2812_PWM_FREQUENCY/800000)   /**< Clock period in ticks. 1 / 800kHz = 1.25 uS */
 
 /**
  * @brief   Number of bit-periods to hold the data line low at the end of a frame
@@ -97,7 +97,7 @@
  * NOTE: Adapted for WS2812B, reset time 280 µs, 256 bits
  */
 #define WS2812_COLOR_BITS       (WS2812_COLOR_N*8)
-#define WS2812_RESET_BIT_N      (256)
+#define WS2812_RESET_BIT_N      (500)
 #define WS2812_COLOR_BIT_N      (WS2812_LED_N*WS2812_COLOR_BITS)            /**< Number of data bits */
 #define WS2812_BIT_N            (WS2812_COLOR_BIT_N + WS2812_RESET_BIT_N)   /**< Total number of bits in a frame */
 
@@ -117,7 +117,7 @@
  *
  * The duty cycle is calculated for a high period of 350 nS.
  */
-#define WS2812_DUTYCYCLE_0      (WS2812_PWM_FREQUENCY/(1000000000/250))
+#define WS2812_DUTYCYCLE_0      (WS2812_PWM_FREQUENCY/(1000000000/350))
 
 /**
  * @brief   High period for a one, in ticks

@@ -6,7 +6,7 @@ PROJECT = ebike-controller
 BUILDDIR = build
 UINCDIR += src u8glib
 
-USE_OPT += -Os -g -gdwarf-2 -g3 -Wno-unused \
+USE_OPT += -Os -g -gdwarf-2 -g3 -Wno-unused -Wno-deprecated \
         -fomit-frame-pointer -falign-functions=16 -std=gnu99 -ffast-math -Wno-attributes
 
 # Bootloader

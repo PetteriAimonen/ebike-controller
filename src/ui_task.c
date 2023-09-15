@@ -102,7 +102,7 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
-  int entries = 7;
+  int entries = 10;
 
   if (!editing)
   {
@@ -117,6 +117,7 @@ static bool config_page(char button)
 
   int hall_in = motor_orientation_get_hall_sector();
   int temperature = get_mosfet_temperature_mC() / 1000;
+  int brake = (palReadPad(GPIOB, GPIOB_BRAKE) == 0);
 
   u8g_FirstPage(&u8g);
   do {
@@ -129,6 +130,7 @@ static bool config_page(char button)
     config_entry(6, selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
     config_entry(7, selected, editing, "Hall in.", &hall_in, delta);
     config_entry(8, selected, editing, "Temperat", &temperature, delta);
+    config_entry(9, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 
