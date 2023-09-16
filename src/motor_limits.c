@@ -2,6 +2,7 @@
 #include "motor_config.h"
 #include "motor_sampling.h"
 #include "motor_orientation.h"
+#include "settings.h"
 #include "log_task.h"
 
 static float g_motor_limit_filtered = 1.0f;

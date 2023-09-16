@@ -6,6 +6,7 @@
 #include "debug.h"
 #include "wheel_speed.h"
 #include "motor_config.h"
+#include "settings.h"
 
 static int g_wheel_tickcount;
 static int g_wheel_sensor_debounce;
@@ -15,13 +16,18 @@ static float g_velocity_filtered;
 static bool g_previous_state;
 static int g_previous_interval_history[6];
 
+static float meters_per_tick()
+{
+  return g_system_state.wheel_diameter_inch * (0.0254f * 3.1415f) / g_system_state.wheel_speed_ticks_per_rotation;
+}
+
 float interval_to_velocity(int interval)
 {
   if (interval == 0)
     return 0.0f;
   
   float interval_s = interval / (float)CONTROL_FREQ;
-  float speed = WHEEL_SPEED_STEP / interval_s;
+  float speed = meters_per_tick() / interval_s;
   
   return speed;
 }
@@ -37,6 +43,12 @@ float wheel_speed_get_velocity()
 
 float wheel_speed_get_acceleration()
 {
+  if (g_system_state.wheel_speed_ticks_per_rotation < 6)
+  {
+    // Can't get reliable acceleration with this few ticks
+    return 0.0f;
+  }
+
   float sum_accel = 0.0f;
   float min = 99999.0f;
   float max = -99999.0f;
@@ -61,7 +73,7 @@ float wheel_speed_get_acceleration()
 
 int wheel_speed_get_distance()
 {
-  return g_wheel_tickcount * WHEEL_SPEED_STEP;
+  return g_wheel_tickcount * meters_per_tick();
 }
 
 int wheel_speed_get_tickcount()

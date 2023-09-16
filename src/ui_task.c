@@ -6,6 +6,8 @@
 #include "log_task.h"
 #include "sensor_task.h"
 #include "dcdc_control.h"
+#include "settings.h"
+#include "bike_control_task.h"
 #include <ch.h>
 #include <hal.h>
 #include <chprintf.h>
@@ -102,7 +104,7 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
-  int entries = 10;
+  int entries = 17;
 
   if (!editing)
   {
@@ -121,16 +123,24 @@ static bool config_page(char button)
 
   u8g_FirstPage(&u8g);
   do {
-    config_entry(0, selected, editing, "Exit", NULL, delta);
-    config_entry(1, selected, editing, "Acc.bias", &g_system_state.accelerometer_bias_mg, delta);
-    config_entry(2, selected, editing, "Acc.val", &acc_z, delta);
-    config_entry(3, selected, editing, "Acc.inv", &g_system_state.accelerometer_invert, delta);
-    config_entry(4, selected, editing, "Min.volt", &g_system_state.min_voltage_V, delta);
-    config_entry(5, selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
-    config_entry(6, selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
-    config_entry(7, selected, editing, "Hall in.", &hall_in, delta);
-    config_entry(8, selected, editing, "Temperat", &temperature, delta);
-    config_entry(9, selected, editing, "Brake", &brake, delta);
+    config_entry(0,  selected, editing, "Exit", NULL, delta);
+    config_entry(1,  selected, editing, "Acc.bias", &g_system_state.accelerometer_bias_mg, delta);
+    config_entry(2,  selected, editing, "Acc.val", &acc_z, delta);
+    config_entry(3,  selected, editing, "Acc.inv", &g_system_state.accelerometer_invert, delta);
+    config_entry(4,  selected, editing, "Min.volt", &g_system_state.min_voltage_V, delta);
+    config_entry(5,  selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
+    config_entry(6,  selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
+    config_entry(7,  selected, editing, "Wheeldia", &g_system_state.wheel_diameter_inch, delta);
+    config_entry(8,  selected, editing, "WeightKG", &g_system_state.bike_weight_kg, delta);
+    config_entry(9,  selected, editing, "WhlTicks", &g_system_state.wheel_speed_ticks_per_rotation, delta);
+    config_entry(10, selected, editing, "Max.km/h", &g_system_state.max_speed_kmh, delta);
+    config_entry(11, selected, editing, "Torq.N/A", &g_system_state.torque_N_per_A, delta);
+    config_entry(12, selected, editing, "En.Boost", &g_system_state.enable_boost, delta);
+    config_entry(13, selected, editing, "Ped.Sens", &g_system_state.has_pedal_sensor, delta);
+
+    config_entry(entries-3, selected, editing, "Hall in.", &hall_in, delta);
+    config_entry(entries-2, selected, editing, "Temperat", &temperature, delta);
+    config_entry(entries-1, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 
@@ -241,17 +251,9 @@ static void status_page(char button)
                km_x10 / 10, km_x10 % 10, V_x10 / 10, V_x10 % 10);
     u8g_DrawStr(&u8g, 0, 50, buf);
 
-    // Filename
+    // Total distance ever
     u8g_SetFont(&u8g, u8g_font_8x13);
-    int fileindex = log_get_fileindex();
-    if (fileindex >= 0)
-    {
-      chsnprintf(buf, sizeof(buf), "    %04d.txt", fileindex);
-    }
-    else
-    {
-      chsnprintf(buf, sizeof(buf), "    NO MOTOR");
-    }
+    chsnprintf(buf, sizeof(buf), "Total: %5d km", g_system_state.alltime_distance_m / 1000);
     u8g_DrawStr(&u8g, 5, 64, buf);
   } while (u8g_NextPage(&u8g));
 }
@@ -283,7 +285,11 @@ static void ui_thread(void *p)
   bool is_powerout = (motor_orientation_get_hall_sector() == -2);
   bool in_settings = false;
   systime_t prevTime = chVTGetSystemTime();
+  systime_t pressTime = chVTGetSystemTime();
   char prevButton = ' ';
+  uint32_t iter = 0;
+
+  systime_t prev_sysstate_save = chVTGetSystemTime();
 
   if (is_powerout)
   {
@@ -292,12 +298,14 @@ static void ui_thread(void *p)
 
   while (1)
   {
+    iter++;
     chThdSleepMilliseconds(50);
     
     char button = ui_get_button();
     chThdSleepMilliseconds(20);
     char button2 = ui_get_button();
 
+    // Debounce loop
     while (button != button2)
     {
         button = ui_get_button();
@@ -305,8 +313,39 @@ static void ui_thread(void *p)
         button2 = ui_get_button();
     }
 
-    if (button == prevButton)
+    // Keep track how many milliseconds button is pressed for
+    if (prevButton == ' ' && button != ' ')
     {
+      pressTime = chVTGetSystemTime();
+
+      // Reinit to recover from any communication failures
+      // Also gives a kind of "ack" flash
+      u8g_InitComFn(&u8g, &u8g_dev_ssd1306_128x64_i2c, u8g_com_i2c_chibios_fn);
+      prevTime = 0;
+    }
+    int ms_pressed = (systime_t)(chVTGetSystemTime() - pressTime);
+
+    if (!in_settings && prevButton == 'K' && button == ' ')
+    {
+      // Enter settings menu if K pressed for 5-10 seconds
+      if (ms_pressed >= 5000 && ms_pressed <= 10000)
+      {
+        in_settings = true;
+      }
+    }
+
+    // Autorepeat plus and minus keys if held for more than a second
+    if (button == prevButton && ms_pressed > 1000 && (button == '+' || button == '-'))
+    {
+      // Autorepeat
+      if (ms_pressed < 5000)
+      {
+        if ((iter & 7) != 0) button = ' ';
+      }
+    }
+    else if (button == prevButton)
+    {
+      // Button is ' ' while it is being held down
       button = ' ';
     }
     else
@@ -314,22 +353,9 @@ static void ui_thread(void *p)
       prevButton = button;
     }
 
-    if (button != ' ')
-    {
-      // Reinit to recover from any communication failures
-      // Also gives a kind of "ack" flash
-      u8g_InitComFn(&u8g, &u8g_dev_ssd1306_128x64_i2c, u8g_com_i2c_chibios_fn);
-      prevTime = 0;
-    }
-
-    if (!in_settings && button == 'K')
-    {
-      in_settings = true;
-      button = ' ';
-    }
-
+    // Display currently active page
     systime_t timeNow = chVTGetSystemTime();
-    if (timeNow - prevTime > MS2ST(1000))
+    if (timeNow - prevTime > MS2ST(1000) || button != ' ')
     {
       prevTime = timeNow;
 
@@ -349,6 +375,14 @@ static void ui_thread(void *p)
       {
         status_page(button);
       }
+    }
+
+    // Periodically save system state when stopped
+    systime_t time_since_save = chVTGetSystemTime() - prev_sysstate_save;
+    if (!in_settings && time_since_save > S2ST(30) && bike_control_get_motor_current() == 0)
+    {
+      save_system_state();
+      prev_sysstate_save = chVTGetSystemTime();
     }
   }
 }

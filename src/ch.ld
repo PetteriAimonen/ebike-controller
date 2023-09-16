@@ -24,8 +24,10 @@ MEMORY
 {
     /* Bootloader in the first 16 kBytes */
     boot  : org = 0x08000000, len = 16k
-    /* Main program in flash starting at 0x04000 */
-    flash : org = 0x08004000, len = 128k
+    /* Settings storage in the two following 16 kByte sectors */
+    settings : org = 0x08004000, len = 32k
+    /* Main program in flash starting at 0x20000 */
+    flash : org = 0x08020000, len = 128k
     /* Backup of the main firmware starting at 0x40000 */
     backup : org = 0x08040000, len = 128k
     ram0  : org = 0x20000000, len = 128k    /* SRAM1 + SRAM2 */
@@ -41,6 +43,8 @@ MEMORY
 /* Information for bootloader */
 __bootloader_start__ = ORIGIN(boot);
 __bootloader_end__   = ORIGIN(boot) + LENGTH(boot);
+__settings_start__   = ORIGIN(settings);
+__settings_end__     = ORIGIN(settings) + LENGTH(settings);
 __mainprogram_start__ = ORIGIN(flash);
 __mainprogram_end__   = ORIGIN(flash) + LENGTH(flash);
 __backup_start__ = ORIGIN(backup);

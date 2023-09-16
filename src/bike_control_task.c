@@ -8,7 +8,7 @@
 #include "wheel_speed.h"
 #include "sensor_task.h"
 #include "ui_task.h"
-#include "log_task.h"
+#include "settings.h"
 #include "ws2812.h"
 
 static THD_WORKING_AREA(bikestack, 1024);
@@ -193,7 +193,7 @@ static void state_braking()
 
 static void state_waitmove()
 {
-  if (wheel_speed_get_tickcount() - g_brake_pos >= 2)
+  if (wheel_speed_get_tickcount() - g_brake_pos >= 2 || g_system_state.has_pedal_sensor)
   {
     g_bike_state = STATE_POWERED;
   }
@@ -219,7 +219,7 @@ static void state_powered()
     stall_count = 0;
   }
   
-  if (stall_count > 500 || wheel_velocity < BIKE_MIN_VELOCITY)
+  if (stall_count > 500 || (wheel_velocity < BIKE_MIN_VELOCITY && g_system_state.wheel_speed_ticks_per_rotation >= 6))
   {
     // Wheel is stopped
     g_motor_current = 0.0f;
@@ -240,13 +240,7 @@ static void state_powered()
   float decay_time = BIKE_TORQUE_FILTER_S;
   float max_current = g_system_state.max_motor_current_A;
   
-  if (wheel_velocity > BIKE_MAX_VELOCITY)
-  {
-    // Maximum speed
-    target_current = 0.0f;
-    decay_time = 2.0f;
-  }
-  else if (g_acceleration < -BIKE_BRAKE_THRESHOLD_B_M_S2 || wheel_accel < -BIKE_BRAKE_THRESHOLD_M_S2)
+  if (g_acceleration < -BIKE_BRAKE_THRESHOLD_B_M_S2 || wheel_accel < -BIKE_BRAKE_THRESHOLD_M_S2)
   {
     // Soft braking
     decay_time = 0.2f;
@@ -274,7 +268,7 @@ static void state_powered()
         min_pedal_accel = 0.0f;
     }
     
-    if (has_brake_doubleclick() && (time_now - g_brake_time) < S2ST(10))
+    if (has_brake_doubleclick() && (time_now - g_brake_time) < S2ST(10) && g_system_state.enable_boost)
     {
       // Extra power when brake lever is double-clicked
       assist_hill = 1.5f;
@@ -284,7 +278,6 @@ static void state_powered()
       min_pedal_accel = 0.0f;
     }
     
-    
     if (g_prev_pedal_accel < min_pedal_accel)
     {
       target_current = 0;
@@ -292,7 +285,25 @@ static void state_powered()
     }
     else
     {
-      target_current = (g_prev_pedal_accel * assist_flat + g_prev_hill_accel * assist_hill + fudge) * BIKE_WEIGHT_KG / MOTOR_NEWTON_PER_A;
+      float target_accel_m_s2 = (g_prev_pedal_accel * assist_flat + g_prev_hill_accel * assist_hill + fudge);
+      float target_force_N = target_accel_m_s2 * g_system_state.bike_weight_kg;
+      target_current = target_force_N / g_system_state.torque_N_per_A;
+    }
+  }
+
+  float speed_kmh = wheel_velocity * 3.6f;
+  if (speed_kmh > g_system_state.max_speed_kmh)
+  {
+    // Softly limit speed within 2km/h
+    float exceed = speed_kmh - g_system_state.max_speed_kmh;
+    if (exceed > 2)
+    {
+      target_current = 0.0f;
+      decay_time = 2.0f;
+    }
+    else
+    {
+      target_current *= exceed / 2.0f;
     }
   }
   
@@ -348,7 +359,7 @@ static void update_leds()
     // Rear end lights
     for (int i = 0; i < 17; i++)
     {
-      if (i & 1)
+      if (i > 2)
       {
         ws2812_write_led(26 - i, 64, 0, 0);
         ws2812_write_led(27 + i, 64, 0, 0);

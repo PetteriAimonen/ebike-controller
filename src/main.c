@@ -14,6 +14,7 @@
 #include "ui_task.h"
 #include "debug.h"
 #include "ws2812.h"
+#include "settings.h"
 
 void enable_trace()
 {

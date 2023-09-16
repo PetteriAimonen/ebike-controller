@@ -36,7 +36,7 @@
 
 // Distance in meters per one wheel speed sensor tick.
 // Wheel to motor gear ratio is 1:46
-#define WHEEL_SPEED_STEP (2.17f/6)
+// #define WHEEL_SPEED_STEP (2.17f/6)
 
 // Maximum and minimum RPM for motor control purposes
 // Motor speed is assumed to be unknown if it is outside these limits
@@ -58,8 +58,8 @@
 #define BATTERY_MAX_CURRENT_B      8000
 
 // Bike control parameters
-#define MOTOR_NEWTON_PER_A         5.0f
-#define BIKE_WEIGHT_KG           100.0f
+// #define MOTOR_NEWTON_PER_A         5.0f
+// #define BIKE_WEIGHT_KG           100.0f
 #define BIKE_MIN_VELOCITY          0.2f
 #define BIKE_MAX_VELOCITY          7.5f
 #define BIKE_BRAKE_THRESHOLD_M_S2  1.0f

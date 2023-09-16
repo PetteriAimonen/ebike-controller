@@ -135,10 +135,7 @@ void bootloader_restore_backup()
   if ((__backup_start__[1] >> 24) != 0x08)
 	return;
 
-  for (int i = 1; i <= 5; i++)
-  {
-    bootloader_erase_sector(i);
-  }
+  bootloader_erase_sector(5);
   bootloader_write_flash(__mainprogram_start__, __backup_start__, 128 * 1024);
   bootloader_print("Backup firmware restored\r\n");
 }
@@ -206,6 +203,21 @@ void bootloader_main()
   else if (button == '-')
   {
     bootloader_restore_backup();
+  }
+  else if (button == 'K')
+  {
+    // Jump to DFU bootloader
+    uint32_t* sysmem = (uint32_t*)0x1FFF0000;
+    uint32_t stack_ptr = sysmem[0];
+    uint32_t reset_vector = sysmem[1];
+
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    SYSCFG->MEMRMP = 1;
+
+    __asm__(
+      "msr msp, %0\n\t"
+      "bx %1" : : "r" (stack_ptr),
+                  "r" (reset_vector) : "memory");
   }
   
   /* Now continue to the main application */

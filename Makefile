@@ -7,14 +7,14 @@ BUILDDIR = build
 UINCDIR += src u8glib
 
 USE_OPT += -Os -g -gdwarf-2 -g3 -Wno-unused -Wno-deprecated \
-        -fomit-frame-pointer -falign-functions=16 -std=gnu99 -ffast-math -Wno-attributes
+        -fomit-frame-pointer -falign-functions=16 -std=gnu11 -ffast-math -Wno-attributes -Wno-array-bounds
 
 # Bootloader
 PROJECT_CSRC += src/bootloader.c
-USE_OPT += -DCORTEX_VTOR_INIT=0x00004000
+USE_OPT += -DCORTEX_VTOR_INIT=0x00020000
 
 # Base system & bootup
-PROJECT_CSRC += src/main.c src/board.c src/debug.c
+PROJECT_CSRC += src/main.c src/board.c src/debug.c src/settings.c
 
 # Shell
 PROJECT_CSRC += src/usbcfg.c src/usb_usart.c src/bluetooth_usart.c src/shell_commands.c
@@ -74,8 +74,11 @@ debug_orbtrace:
 		-c "gdb_port pipe"' -iex 'mon halt' \
 		-ex 'set *((uint32_t*)0xe0042004) = 0x07' $(BUILDDIR)/$(PROJECT).elf
 
-program_dfu: $(BUILDDIR)/$(PROJECT).bin
-	dfu-util -D $< -a 0 --dfuse-address 0x08000000
+$(BUILDDIR)/$(PROJECT).dfu: $(BUILDDIR)/$(PROJECT).hex
+	python dfuse-pack.py -i $< $@
+
+program_dfu: $(BUILDDIR)/$(PROJECT).dfu
+	dfu-util -a 0 -D $<
 
 %.o: %.c
     # Just to make kdevelop include path discovery work.
