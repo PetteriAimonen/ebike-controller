@@ -27,6 +27,7 @@ static struct {
   int ticks_per_sector_2;   // Ticks elapsed during second to last sector
 
   float filter_rpm;         // Filtered motor speed estimate
+  float acceleration;       // Acceleration estimate (RPM/s)
 } g_hall;
 
 // From main.c, whether motor is connected
@@ -150,7 +151,12 @@ void motor_orientation_update()
   // Filter the motor RPM estimate for less speed critical uses
   float rpm = motor_orientation_get_fast_rpm();
   float rpm_decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
-  g_hall.filter_rpm = g_hall.filter_rpm * (1 - rpm_decay) + rpm * rpm_decay;
+  float rpm_delta = (rpm - g_hall.filter_rpm) * rpm_decay;
+  g_hall.filter_rpm += rpm_delta;
+
+  // Estimate acceleration
+  float accel = rpm_delta * CONTROL_FREQ;
+  g_hall.acceleration += (accel - g_hall.acceleration) * rpm_decay;
 }
 
 int motor_orientation_get_angle()
@@ -233,6 +239,11 @@ int motor_orientation_get_fast_rpm()
 int motor_orientation_get_rpm()
 {
   return (int)g_hall.filter_rpm;
+}
+
+int motor_orientation_get_acceleration()
+{
+  return (int)g_hall.acceleration;
 }
 
 bool motor_orientation_in_sync()

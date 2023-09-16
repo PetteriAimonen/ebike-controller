@@ -28,7 +28,7 @@
 
 // Filter time for motor temperature and battery currents
 #define MOTOR_FILTER_TIME_S   0.1f
-#define DUTY_LIMIT_FILTER_S   5.0f
+#define DUTY_LIMIT_FILTER_S   0.2f
 
 // Field oriented control PI loop terms
 #define FOC_P_TERM 0.1f
@@ -71,6 +71,6 @@
 #define BIKE_BRAKE_THRESHOLD_B_M_S2  5.0f
 #define BIKE_TORQUE_FILTER_S       0.5f
 #define BIKE_MIN_CURRENT_A         0.2f
-#define BIKE_SOFTSTART_A           0.5f
-#define BIKE_SOFTSTART_S           0.3f
+#define BIKE_SOFTSTART_A           1.0f
+#define BIKE_SOFTSTART_S           0.5f
 #define BIKE_MIN_PEDAL_ACCEL       0.1f

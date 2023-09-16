@@ -19,6 +19,9 @@ int motor_orientation_get_angle();
 // Returns instantaneous RPM value or 0 if stopped or not synchronized
 int motor_orientation_get_fast_rpm();
 
+// Returns instantaneous acceleration value, RPM per second
+int motor_orientation_get_acceleration();
+
 // Returns filtered RPM value
 int motor_orientation_get_rpm();
 

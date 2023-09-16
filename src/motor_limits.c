@@ -5,6 +5,7 @@
 #include "settings.h"
 #include "log_task.h"
 
+static float g_motor_limit_instant = 1.0f;
 static float g_motor_limit_filtered = 1.0f;
 
 static void apply_limit(float *fraction, int limitA, int limitB, int value)
@@ -31,7 +32,11 @@ void motor_limits_update()
 {
   float fraction = 1.0f;
   
-  apply_limit(&fraction, g_system_state.max_krpm * 1000, g_system_state.max_krpm * 1100, motor_orientation_get_rpm());
+  apply_limit(&fraction, g_system_state.max_krpm * 1000, g_system_state.max_krpm * 1200, motor_orientation_get_rpm());
+
+  int max_accel = g_system_state.max_krpm * 1000 / g_system_state.accel_time;
+  apply_limit(&fraction, max_accel, max_accel * 2, motor_orientation_get_acceleration());
+
 //   apply_limit(&max_duty, MOTOR_MAX_TEMP_A, MOTOR_MAX_TEMP_B, get_motor_temperature_mC());
   apply_limit(&fraction, MOSFET_MAX_TEMP_A, MOSFET_MAX_TEMP_B, get_mosfet_temperature_mC());
   apply_limit(&fraction, -g_system_state.min_voltage_V * 1000, -(g_system_state.min_voltage_V - 3) * 1000, -get_battery_voltage_mV());
@@ -39,6 +44,8 @@ void motor_limits_update()
   
   float decay = 1.0f / (CONTROL_FREQ * DUTY_LIMIT_FILTER_S);
   
+  g_motor_limit_instant = fraction;
+
   if (fraction > g_motor_limit_filtered)
     g_motor_limit_filtered += decay;
   else if (fraction < g_motor_limit_filtered)
@@ -53,5 +60,5 @@ void motor_limits_update()
 
 float motor_limits_get_fraction()
 {
-  return g_motor_limit_filtered;
+  return (g_motor_limit_filtered + g_motor_limit_instant) / 4;
 }

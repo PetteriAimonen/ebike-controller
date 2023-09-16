@@ -109,11 +109,14 @@ static void do_field_oriented_control(bool do_modulation)
   ITM->PORT[ITM_HALLSECTOR].u8 = motor_orientation_get_hall_sector();
   // ITM->PORT[ITM_TARGETCURRENT].u16 = g_foc_torque_current;
 
-  
   // Do PI control to match the requested torque
   // Current varies from 0..MAX_MOTOR_CURRENT.
   // The voltage vector length varies 0..1
   float complex reference = I * g_foc_torque_current * motor_limits_get_fraction();
+
+  // Add small amount of holding current for stability
+  reference += 0.1f;
+
   float complex error = reference - current;
   g_foc_I_accumulator += FOC_I_TERM * error;
   float complex voltage = reference + FOC_P_TERM * error + g_foc_I_accumulator;
