@@ -29,6 +29,8 @@ typedef struct
   int torque_N_per_A;
   int enable_boost;
   int has_pedal_sensor;
+  int max_krpm;
+  int accel_time;
 } system_state_t;
 
 // Constant size struct with padding for flash storage

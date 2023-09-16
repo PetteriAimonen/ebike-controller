@@ -115,12 +115,14 @@ void load_system_state()
   if (g_system_state.wheel_speed_ticks_per_rotation == 0) g_system_state.wheel_speed_ticks_per_rotation = 6;
   if (g_system_state.max_speed_kmh == 0) g_system_state.max_speed_kmh = 25;
   if (g_system_state.torque_N_per_A == 0) g_system_state.torque_N_per_A = 5;
+  if (g_system_state.max_krpm == 0) g_system_state.max_krpm = 10;
+  if (g_system_state.accel_time == 0) g_system_state.accel_time = 5;
 }
 
 void save_system_state()
 {
+  system_state_store_t to_save = {};
   __disable_irq();
-  system_state_store_t to_save;
   to_save.state = g_system_state;
   __enable_irq();
 

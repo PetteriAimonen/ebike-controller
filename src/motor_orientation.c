@@ -2,11 +2,11 @@
 #include <hal.h>
 #include <stm32f4xx.h>
 #include <stdlib.h>
+#include <math.h>
 #include "debug.h"
+#include "settings.h"
 #include "motor_config.h"
 #include "motor_orientation.h"
-
-static float g_motor_filtered_rpm;
 
 static struct {
   uint32_t tickcount;       // Running tick count incremented at CONTROL_FREQ
@@ -25,6 +25,8 @@ static struct {
 
   int ticks_per_sector;     // Ticks elapsed during last hall sector
   int ticks_per_sector_2;   // Ticks elapsed during second to last sector
+
+  float filter_rpm;         // Filtered motor speed estimate
 } g_hall;
 
 // From main.c, whether motor is connected
@@ -86,7 +88,7 @@ void motor_orientation_update()
   uint32_t ticks_pending = (uint32_t)(g_hall.tickcount - g_hall.pending_time);
   if (g_hall.pending_sector < 0 && ticks_pending > HALL_TIMEOUT)
   {
-    g_motor_filtered_rpm = 0;
+    g_hall.filter_rpm = 0;
     g_hall.valid = false;
   }
 
@@ -128,8 +130,8 @@ void motor_orientation_update()
   }
 
   // Detect when we are synced to rotation
-  uint32_t max_ticks_per_sector = (60 * CONTROL_FREQ) / CTRL_MIN_RPM;
-  uint32_t min_ticks_per_sector = (60 * CONTROL_FREQ) / CTRL_MAX_RPM;
+  uint32_t max_ticks_per_sector = (60 * CONTROL_FREQ) / (6 * CTRL_MIN_RPM);
+  uint32_t min_ticks_per_sector = (60 * CONTROL_FREQ) / (6 * CTRL_MAX_RPM);
   uint32_t time_since_reversal = g_hall.tickcount - g_hall.last_reversal;
   if (ticks_pending <= max_ticks_per_sector &&
       g_hall.ticks_per_sector >= min_ticks_per_sector &&
@@ -147,8 +149,8 @@ void motor_orientation_update()
 
   // Filter the motor RPM estimate for less speed critical uses
   float rpm = motor_orientation_get_fast_rpm();
-  float decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
-  g_motor_filtered_rpm = g_motor_filtered_rpm * (1 - decay) + rpm * decay;
+  float rpm_decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
+  g_hall.filter_rpm = g_hall.filter_rpm * (1 - rpm_decay) + rpm * rpm_decay;
 }
 
 int motor_orientation_get_angle()
@@ -230,7 +232,7 @@ int motor_orientation_get_fast_rpm()
 
 int motor_orientation_get_rpm()
 {
-  return (int)g_motor_filtered_rpm;
+  return (int)g_hall.filter_rpm;
 }
 
 bool motor_orientation_in_sync()

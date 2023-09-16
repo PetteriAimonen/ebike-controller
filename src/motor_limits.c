@@ -31,7 +31,7 @@ void motor_limits_update()
 {
   float fraction = 1.0f;
   
-  apply_limit(&fraction, MOTOR_MAX_RPM_A, MOTOR_MAX_RPM_B, motor_orientation_get_rpm());
+  apply_limit(&fraction, g_system_state.max_krpm * 1000, g_system_state.max_krpm * 1100, motor_orientation_get_rpm());
 //   apply_limit(&max_duty, MOTOR_MAX_TEMP_A, MOTOR_MAX_TEMP_B, get_motor_temperature_mC());
   apply_limit(&fraction, MOSFET_MAX_TEMP_A, MOSFET_MAX_TEMP_B, get_mosfet_temperature_mC());
   apply_limit(&fraction, -g_system_state.min_voltage_V * 1000, -(g_system_state.min_voltage_V - 3) * 1000, -get_battery_voltage_mV());

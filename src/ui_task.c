@@ -104,7 +104,7 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
-  int entries = 17;
+  int entries = 20;
 
   if (!editing)
   {
@@ -137,6 +137,8 @@ static bool config_page(char button)
     config_entry(11, selected, editing, "Torq.N/A", &g_system_state.torque_N_per_A, delta);
     config_entry(12, selected, editing, "En.Boost", &g_system_state.enable_boost, delta);
     config_entry(13, selected, editing, "Ped.Sens", &g_system_state.has_pedal_sensor, delta);
+    config_entry(14, selected, editing, "Max.kRPM", &g_system_state.max_krpm, delta);
+    config_entry(15, selected, editing, "Acc.time", &g_system_state.accel_time, delta);
 
     config_entry(entries-3, selected, editing, "Hall in.", &hall_in, delta);
     config_entry(entries-2, selected, editing, "Temperat", &temperature, delta);
@@ -327,8 +329,8 @@ static void ui_thread(void *p)
 
     if (!in_settings && prevButton == 'K' && button == ' ')
     {
-      // Enter settings menu if K pressed for 5-10 seconds
-      if (ms_pressed >= 5000 && ms_pressed <= 10000)
+      // Enter settings menu if K pressed for 3-10 seconds
+      if (ms_pressed >= 3000 && ms_pressed <= 10000)
       {
         in_settings = true;
       }

@@ -308,10 +308,10 @@ static void cmd_status(BaseSequentialStream *chp, int argc, char *argv[])
   chprintf(chp, "Battery voltage:      %8d mV\r\n", get_battery_voltage_mV());
   chprintf(chp, "Battery current:      %8d mA\r\n", get_battery_current_mA());
   chprintf(chp, "Mosfet temperature:   %8d mC\r\n", get_mosfet_temperature_mC());
-  chprintf(chp, "Motor RPM:            %8d\r\n",    motor_orientation_get_rpm());
+  chprintf(chp, "Motor RPM:            %8d (sync: %d)\r\n",    motor_orientation_get_rpm(), (int)motor_orientation_in_sync());
   chprintf(chp, "Wheel velocity:       %8d m/s\r\n", (int)wheel_speed_get_velocity());
   chprintf(chp, "Wheel distance:       %8d m\r\n",  wheel_speed_get_distance());
-  chprintf(chp, "Acceleration:         %8d mg\r\n", bike_control_get_acceleration());
+  chprintf(chp, "Acceleration:         %8d mg\r\n", bike_control_get_acceleration() / 10);
   chprintf(chp, "Motor target current: %8d mA\r\n", bike_control_get_motor_current());
   chprintf(chp, "Motor max power:      %8d %%\r\n", (int)(motor_limits_get_fraction() * 100));
   chprintf(chp, "Motor angle:          %8d deg, HALL %4d\r\n", motor_orientation_get_angle(), motor_orientation_get_hall_angle());

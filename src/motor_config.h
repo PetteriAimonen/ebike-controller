@@ -4,7 +4,7 @@
 #define HALL_OFFSET 210
 
 // Glitch filter count for hall sensors (number of samples)
-#define HALL_FILTER 5
+#define HALL_FILTER 3
 
 // Timeout for invalid hall sensor readings
 #define HALL_TIMEOUT 500
@@ -35,19 +35,21 @@
 #define FOC_I_TERM 0.05f
 
 // Distance in meters per one wheel speed sensor tick.
-// Wheel to motor gear ratio is 1:46
+// Wheel to motor gear ratio is 1:46 for the 28" wheels, 1:117 for the 20" wheel
 // #define WHEEL_SPEED_STEP (2.17f/6)
+
+#define MOTOR_ORIENTATION_FILTER_TIME 0.1f
 
 // Maximum and minimum RPM for motor control purposes
 // Motor speed is assumed to be unknown if it is outside these limits
 #define CTRL_MIN_RPM 100
-#define CTRL_MAX_RPM 20000
+#define CTRL_MAX_RPM 25000
 
 // Maximum motor speed, temperatures and minimum battery voltage
 // For each, A point gives the start of the linear duty lowering,
 // and B point is where the duty drops to 0%.
-#define MOTOR_MAX_RPM_A         8500
-#define MOTOR_MAX_RPM_B         10000
+// #define MOTOR_MAX_RPM_A         9000
+// #define MOTOR_MAX_RPM_B         10000
 #define MOTOR_MAX_TEMP_A          50000
 #define MOTOR_MAX_TEMP_B          70000
 #define MOSFET_MAX_TEMP_A         60000
@@ -56,6 +58,9 @@
 #define BATTERY_MIN_VOLTAGE_B     30000
 #define BATTERY_MAX_CURRENT_A      6000
 #define BATTERY_MAX_CURRENT_B      8000
+
+// Maximum acceleration, as time in seconds from 0 to max RPM
+// #define MOTOR_MIN_ACCEL_TIME    5.0f
 
 // Bike control parameters
 // #define MOTOR_NEWTON_PER_A         5.0f
