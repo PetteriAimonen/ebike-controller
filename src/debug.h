@@ -14,7 +14,10 @@ void abort_with_error(const char *fmt, ...);
 #define ITM_ORIENTATION     16
 #define ITM_HALLSECTOR      17
 #define ITM_TARGETCURRENT   18
+#define ITM_RPM             19
 #define ITM_UVECTOR_R       20
 #define ITM_UVECTOR_I       21
 #define ITM_IVECTOR_R       22
 #define ITM_IVECTOR_I       23
+#define ITM_ABSCUR          24
+#define ITM_ACCEL           25

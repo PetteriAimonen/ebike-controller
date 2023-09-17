@@ -71,6 +71,12 @@ static void config_entry(int i, int selected, bool editing, const char *name, vo
 
   i -= selected;
 
+  if (i < -2 || i > 2)
+  {
+    // Out of screen
+    return;
+  }
+
   if (value)
   {
     chsnprintf(buf, sizeof(buf), "%c%8s:%c%3d%c",
@@ -140,9 +146,9 @@ static bool config_page(char button)
     config_entry(14, selected, editing, "Max.kRPM", &g_system_state.max_krpm, delta);
     config_entry(15, selected, editing, "Acc.time", &g_system_state.accel_time, delta);
 
-    config_entry(entries-3, selected, editing, "Hall in.", &hall_in, delta);
-    config_entry(entries-2, selected, editing, "Temperat", &temperature, delta);
-    config_entry(entries-1, selected, editing, "Brake", &brake, delta);
+    config_entry(16, selected, editing, "Hall in.", &hall_in, delta);
+    config_entry(17, selected, editing, "Temperat", &temperature, delta);
+    config_entry(18, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 

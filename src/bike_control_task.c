@@ -377,8 +377,8 @@ static void update_leds()
     {
       if (ratio > i * 0.1f)
       {
-        ws2812_write_led(26 - 17 - i, 64, 64, 0);
-        ws2812_write_led(27 + 17 + i, 64, 64, 0);
+        ws2812_write_led(26 - 17 - i, 64, 32, 0);
+        ws2812_write_led(27 + 17 + i, 64, 32, 0);
       }
       else
       {

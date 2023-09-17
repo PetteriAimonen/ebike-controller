@@ -94,9 +94,10 @@ void motor_orientation_update()
   }
 
   // Filter for short glitches and detect sector change
+  int expected_sector = (g_hall.prev_sector + g_hall.prev_direction + 6) % 6;
   if (g_hall.pending_sector >= 0 &&
       g_hall.pending_sector != g_hall.prev_sector &&
-      ticks_pending > HALL_FILTER)
+      (ticks_pending > HALL_FILTER || g_hall.pending_sector == expected_sector))
   {
     g_hall.prev_estimate = motor_orientation_get_angle();
     
@@ -138,8 +139,8 @@ void motor_orientation_update()
       g_hall.ticks_per_sector >= min_ticks_per_sector &&
       g_hall.ticks_per_sector <= max_ticks_per_sector &&
       g_hall.ticks_per_sector <= g_hall.ticks_per_sector_2 * 2 &&
-      g_hall.ticks_per_sector >= g_hall.ticks_per_sector_2 / 2 &&
-      time_since_reversal > CONTROL_FREQ * HALL_BACKOFF_MS / 1000)
+      g_hall.ticks_per_sector >= g_hall.ticks_per_sector_2 / 2/* &&
+      time_since_reversal > CONTROL_FREQ * HALL_BACKOFF_MS / 1000 */)
   {
     g_hall.valid = true;
   }
@@ -150,7 +151,10 @@ void motor_orientation_update()
 
   // Filter the motor RPM estimate for less speed critical uses
   float rpm = motor_orientation_get_fast_rpm();
-  float rpm_decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
+  int filter_ticks = g_hall.ticks_per_sector * MOTOR_RPM_FILTER_SECTORS;
+  if (filter_ticks > MOTOR_RPM_FILTER_TIME_MAX * CONTROL_FREQ) filter_ticks = MOTOR_RPM_FILTER_TIME_MAX * CONTROL_FREQ;
+  if (filter_ticks < MOTOR_RPM_FILTER_TIME_MIN * CONTROL_FREQ) filter_ticks = MOTOR_RPM_FILTER_TIME_MIN * CONTROL_FREQ;
+  float rpm_decay = 1.0f / filter_ticks;
   float rpm_delta = (rpm - g_hall.filter_rpm) * rpm_decay;
   g_hall.filter_rpm += rpm_delta;
 
@@ -185,9 +189,9 @@ int motor_orientation_get_angle()
     int delta_to_apply = delta * time_to_sector_end / sector_total_time;
     return wrap_angle(next_angle + delta_to_apply);
   }
-  else if (time_to_sector_end > -ticks_per_sector / 4)
+  else if (time_to_sector_end > -ticks_per_sector / 2)
   {
-    // Extrapolate up to 15 deg into next sector
+    // Extrapolate up to 30 deg into next sector
     int next_angle = g_hall.prev_angle + g_hall.prev_direction * 60;
     int extra_angle = 60 * (-time_to_sector_end) / ticks_per_sector;
     return wrap_angle(next_angle + extra_angle * g_hall.prev_direction);
@@ -196,7 +200,7 @@ int motor_orientation_get_angle()
   {
     // Hold the estimate, motor is probably stalled
     int next_angle = g_hall.prev_angle + g_hall.prev_direction * 60;
-    return wrap_angle(next_angle + 15 * g_hall.prev_direction);
+    return wrap_angle(next_angle + 30 * g_hall.prev_direction);
   }
 }
 
@@ -215,7 +219,7 @@ int motor_orientation_get_fast_rpm()
   {
     return 0;
   }
-  else if (latest_ticks > ticks_per_sector)
+  else if (latest_ticks > ticks_per_sector * 3 / 2)
   {
     ticks_per_sector = latest_ticks;
   }

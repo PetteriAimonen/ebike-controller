@@ -31,6 +31,7 @@ typedef struct
   int has_pedal_sensor;
   int max_krpm;
   int accel_time;
+  uint32_t sd_log_sector;
 } system_state_t;
 
 // Constant size struct with padding for flash storage

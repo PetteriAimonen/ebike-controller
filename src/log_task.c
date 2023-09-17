@@ -1,9 +1,10 @@
 #include <ch.h>
 #include <hal.h>
-#include <ff.h>
 #include <chprintf.h>
 #include <stdlib.h>
+#include <string.h>
 #include "log_task.h"
+#include "filesystem.h"
 #include "ui_task.h"
 #include "motor_sampling.h"
 #include "motor_orientation.h"
@@ -23,65 +24,40 @@ static int g_fileindex = -1;
 #define EVENT_BUF1 1
 #define EVENT_BUF2 2
 
-static int next_free_filename()
-{
-  DIR directory;
-  FILINFO file;
-  FRESULT status;
-  
-  status = f_opendir(&directory, "/");
-  
-  int max = 0;
-  while ((status = f_readdir(&directory, &file)) == FR_OK
-         && file.fname[0] != '\0')
-  {
-    int i = atoi(file.fname);
-    if (i > max)
-      max = i;
-  }
-  
-  return max + 1;
-}
-
-int log_get_fileindex()
-{
-  return g_fileindex;
-}
-
 void log_saver_thread(void *p)
 {
   chRegSetThreadName("logsaver");
   
-  char filename[16];
-  g_fileindex = next_free_filename();
-  chsnprintf(filename, sizeof(filename), "%04d.txt", g_fileindex);
-  
-  unsigned bytes_written;
-  FIL file;
-  f_open(&file, filename, FA_WRITE | FA_CREATE_NEW);
-  
-  static const char header[] = "# SysTime    Dist.     Vel.    WAcc.    BattU    BattI    Tmosfet     RPM     Limit"
-                               "  Accel  Current    State   Clicks   HillA    PedalA\r\n"
-                               "#      ms       m      mm/s   mm^2/s       mV       mA         mC     rpm      %% "
-                               "   mm/s^2        mA                   mm/s^2   mm/s^2\r\n";
-  f_write(&file, header, sizeof(header) - 1, &bytes_written);
-  
   for (;;)
   {
     eventmask_t event = chEvtWaitOne(EVENT_BUF1 | EVENT_BUF2);
-    
+
     if (event & EVENT_BUF1)
     {
-      f_write(&file, g_logbuffer1, sizeof(g_logbuffer1), &bytes_written);
+      int status = filesystem_write(g_system_state.sd_log_sector, g_logbuffer1, sizeof(g_logbuffer1));
+      if (status > 0) g_system_state.sd_log_sector += status;
     }
     
     if (event & EVENT_BUF2)
     {
-      f_write(&file, g_logbuffer2, sizeof(g_logbuffer2), &bytes_written);
+      int status = filesystem_write(g_system_state.sd_log_sector, g_logbuffer2, sizeof(g_logbuffer2));
+      if (status > 0) g_system_state.sd_log_sector += status;
     }
-    
-    f_sync(&file);
   }
+}
+
+static uint32_t compute_checksum(eventlog_store_t *entry)
+{
+  uint32_t checksum = 0xAAAA;
+  for (int i = 1; i < 64; i++)
+  {
+    checksum ^= entry->raw[i];
+    checksum ^= checksum << 13;
+	  checksum ^= checksum >> 17;
+	  checksum ^= checksum << 5;
+  }
+
+  return checksum;
 }
 
 void log_writer_thread(void *p)
@@ -101,38 +77,49 @@ void log_writer_thread(void *p)
   {
     chThdSleepMilliseconds(50);
     
+    int log_interval = (motor_orientation_get_rpm() == 0) ? 10 : 1;
+
     log_div++;
-    if (log_div >= 10)
+    if (log_div >= log_interval)
     {
       log_div = 0;
-      static char buf[512];
-      chsnprintf(buf, sizeof(buf),
-              "%8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8d %8s %8d %8d %8d\r\n",
-              chVTGetSystemTime(),
-              wheel_speed_get_distance(), (int)(wheel_speed_get_velocity() * 1000.0f), (int)(wheel_speed_get_acceleration() * 1000.0f),
-              get_battery_voltage_mV(), get_battery_current_mA(),
-              get_mosfet_temperature_mC(), motor_orientation_get_fast_rpm(), (int)(100*motor_limits_get_fraction()),
-              bike_control_get_acceleration(), bike_control_get_motor_current(),
-              bike_control_get_state(), ui_get_ok_button_clicks(), bike_control_get_hill_accel(), bike_control_get_pedal_accel());
 
-      char *p = buf;
-      while (*p)
+      eventlog_store_t logentry = {};
+
+      logentry.log.systime = chVTGetSystemTime();
+      logentry.log.alltime_distance_m = g_system_state.alltime_distance_m;
+      logentry.log.trip_distance_m = wheel_speed_get_distance();
+      logentry.log.wheel_velocity = wheel_speed_get_velocity();
+      logentry.log.wheel_accel = wheel_speed_get_acceleration();
+      logentry.log.motor_rpm = motor_orientation_get_fast_rpm();
+      logentry.log.motor_target_current = bike_control_get_motor_current();
+      logentry.log.battery_voltage = get_battery_voltage_mV() / 1000.0f;
+      logentry.log.battery_current = get_battery_current_mA() / 1000.0f;
+      logentry.log.mosfet_temperature = get_mosfet_temperature_mC() / 1000.0f;
+      logentry.log.duty_limit = motor_limits_get_fraction();
+      logentry.log.hill_accel = bike_control_get_hill_accel() / 1000.0f;
+      logentry.log.pedal_accel = bike_control_get_pedal_accel() / 1000.0f;
+      strncpy(logentry.log.state, bike_control_get_state(), 8);
+      logentry.log.motor_angle = motor_orientation_get_angle();
+      logentry.log.hall_angle = motor_orientation_get_hall_angle();
+      logentry.log.assist_level = ui_get_assist_level();
+
+      logentry.log.checksum = compute_checksum(&logentry);
+
+      uint8_t *dest = (write_next == EVENT_BUF1) ? g_logbuffer1 : g_logbuffer2;
+      memcpy(dest + writeptr, &logentry, sizeof(logentry));
+      writeptr += sizeof(logentry);
+      
+      if (writeptr == sizeof(g_logbuffer1))
       {
-        uint8_t *dest = (write_next == EVENT_BUF1) ? g_logbuffer1 : g_logbuffer2;
-        while (*p && writeptr < sizeof(g_logbuffer1))
-        {
-          dest[writeptr++] = *p++;
-        }
-        
-        if (writeptr == sizeof(g_logbuffer1))
-        {
-          chEvtSignal(g_logsaver, write_next);
-          write_next = (write_next == EVENT_BUF1) ? EVENT_BUF2 : EVENT_BUF1;
-          writeptr = 0;
-        }
+        // Buffer filled up, save it to SD card
+        chEvtSignal(g_logsaver, write_next);
+        write_next = (write_next == EVENT_BUF1) ? EVENT_BUF2 : EVENT_BUF1;
+        writeptr = 0;
       }
     }
 
+    // Update system state
     g_system_state.prev_voltage_mV = get_battery_voltage_mV();
     int delta_d = wheel_speed_get_distance() - prev_distance;
     g_system_state.total_distance_m += delta_d;

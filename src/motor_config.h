@@ -4,7 +4,7 @@
 #define HALL_OFFSET 210
 
 // Glitch filter count for hall sensors (number of samples)
-#define HALL_FILTER 3
+#define HALL_FILTER 5
 
 // Timeout for invalid hall sensor readings
 #define HALL_TIMEOUT 500
@@ -26,9 +26,15 @@
 // Maximum motor current (mA)
 #define MAX_MOTOR_CURRENT 15000
 
+// Filter time for motor RPM estimate, in number of sectors
+#define MOTOR_RPM_FILTER_SECTORS 6
+#define MOTOR_RPM_FILTER_TIME_MIN 0.05f
+#define MOTOR_RPM_FILTER_TIME_MAX 0.5f
+
 // Filter time for motor temperature and battery currents
-#define MOTOR_FILTER_TIME_S   0.1f
-#define DUTY_LIMIT_FILTER_S   0.2f
+#define MOTOR_FILTER_TIME_S   0.5f
+#define DUTY_LIMIT_FILTER_TRIP_S   0.1f
+#define DUTY_LIMIT_FILTER_RELAX_S   0.5f
 
 // Field oriented control PI loop terms
 #define FOC_P_TERM 0.1f
@@ -61,6 +67,7 @@
 
 // Maximum acceleration, as time in seconds from 0 to max RPM
 // #define MOTOR_MIN_ACCEL_TIME    5.0f
+#define ACCEL_LIMIT_SPEED_M_S      2.0f
 
 // Bike control parameters
 // #define MOTOR_NEWTON_PER_A         5.0f

@@ -148,9 +148,12 @@ static void do_field_oriented_control(bool do_modulation)
   // Report results over SWO pin for debugging
   ITM->PORT[ITM_PWM_CCR1].u16 = TIM1->CCR1;
   ITM->PORT[ITM_PWM_CCR2].u16 = TIM1->CCR2;
-  ITM->PORT[ITM_PWM_CCR3].u16 = TIM1->CCR3;
-  ITM->PORT[ITM_UVECTOR_R].u16 = (int16_t)(crealf(voltage) * 16384.0f);
-  ITM->PORT[ITM_UVECTOR_I].u16 = (int16_t)(cimagf(voltage) * 16384.0f);
+  // ITM->PORT[ITM_PWM_CCR3].u16 = TIM1->CCR3;
+  ITM->PORT[ITM_RPM].u16 = motor_orientation_get_fast_rpm();
+  ITM->PORT[ITM_ABSCUR].u16 = (uint16_t)(motor_limits_get_fraction() * 100);
+  ITM->PORT[ITM_ACCEL].u16 = motor_orientation_get_acceleration();
+  // ITM->PORT[ITM_UVECTOR_R].u16 = (int16_t)(crealf(voltage) * 16384.0f);
+  // ITM->PORT[ITM_UVECTOR_I].u16 = (int16_t)(cimagf(voltage) * 16384.0f);
 }
 
 CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)

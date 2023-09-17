@@ -11,11 +11,13 @@
 #include "dcdc_control.h"
 #include "motor_orientation.h"
 #include "motor_sampling.h"
-#include <ff.h>
 #include "sensor_task.h"
 #include "bike_control_task.h"
 #include "motor_limits.h"
 #include "wheel_speed.h"
+#include "settings.h"
+#include "filesystem.h"
+#include "log_task.h"
 
 static void cmd_mem(BaseSequentialStream *chp, int argc, char *argv[]) {
     size_t n, size;
@@ -239,54 +241,38 @@ static void cmd_dcdc_out(BaseSequentialStream *chp, int argc, char *argv[])
   set_dcdc_mode(DCDC_OUTPUT_CCCV, mV, mA);
 }
 
-static void cmd_ls(BaseSequentialStream *chp, int argc, char *argv[])
-{
-  DIR directory;
-  FILINFO file;
-  FRESULT status;
-  
-  status = f_opendir(&directory, "/");
-  
-  if (status != FR_OK)
-  {
-    chprintf(chp, "Failed to open SD card: %d\r\n", status);
-    return;
-  }
-  
-  while ((status = f_readdir(&directory, &file)) == FR_OK
-         && file.fname[0] != '\0')
-  {
-    chprintf(chp, "%8ld %s\r\n", file.fsize, file.fname);
-  }
-}
-
-static void cmd_cat(BaseSequentialStream *chp, int argc, char *argv[])
-{
+static void cmd_readlog(BaseSequentialStream *chp, int argc, char *argv[])
+{ 
   if (argc == 0)
   {
-    chprintf(chp, "usage: cat <file>\r\n");
+    chprintf(chp, "usage: readlog <num_sectors>\r\n");
+    chprintf(chp, "sectors available: %d\r\n", (int)g_system_state.sd_log_sector);
     return;
   }
+
+  uint32_t num_sectors = atoi(argv[0]);
+  uint32_t start_sector = g_system_state.sd_log_sector;
+  if (num_sectors > start_sector) num_sectors = start_sector;
+  start_sector -= num_sectors;
   
-  FIL f;
-  FRESULT status;
-  status = f_open(&f, argv[0], FA_READ);
-  
-  if (status != FR_OK)
+  for (int i = 0; i < num_sectors; i++)
   {
-    chprintf(chp, "Failed to open file: %d\r\n", status);
-    return;
+    eventlog_store_t entries[2];
+    int status = filesystem_read(start_sector + i, (uint8_t*)&entries, sizeof(entries));
+
+    if (status > 0)
+    {
+      for (int j = 0; j < 2; j++)
+      {
+        for (int k = 0; k < 64; k++)
+        {
+          chprintf(chp, "%08x", (unsigned)entries[j].raw[k]);
+          chThdSleepMilliseconds(1);
+        }
+        chprintf(chp, "\n");
+      }
+    }
   }
-  
-  char buf[128];
-  unsigned bytes_read;
-  while ((status = f_read(&f, buf, sizeof(buf), &bytes_read)) == FR_OK
-         && bytes_read > 0)
-  {
-    chSequentialStreamWrite(chp, (void*)buf, bytes_read);
-  }
-  
-  f_close(&f);
 }
 
 static void cmd_sensors(BaseSequentialStream *chp, int argc, char *argv[])
@@ -381,8 +367,7 @@ const ShellCommand shell_commands[] = {
   {"motor_rotate", cmd_motor_rotate},
   {"motor_run", cmd_motor_run},
   {"motor_samples", cmd_motor_samples},
-  {"ls", cmd_ls},
-  {"cat", cmd_cat},
+  {"readlog", cmd_readlog},
   {"sensors", cmd_sensors},
   {"status", cmd_status},
   {"i2c", cmd_i2c},
