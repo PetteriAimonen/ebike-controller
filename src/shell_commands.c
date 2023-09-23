@@ -245,16 +245,34 @@ static void cmd_readlog(BaseSequentialStream *chp, int argc, char *argv[])
 { 
   if (argc == 0)
   {
-    chprintf(chp, "usage: readlog <num_sectors>\r\n");
+    chprintf(chp, "usage: readlog <num_sectors> [start_km]\r\n");
     chprintf(chp, "sectors available: %d\r\n", (int)g_system_state.sd_log_sector);
     return;
   }
 
   uint32_t num_sectors = atoi(argv[0]);
   uint32_t start_sector = g_system_state.sd_log_sector;
-  if (num_sectors > start_sector) num_sectors = start_sector;
-  start_sector -= num_sectors;
-  
+
+  if (argc == 1)
+  {
+    // Latest N sectors
+    if (num_sectors > start_sector) num_sectors = start_sector;
+    start_sector -= num_sectors;
+  }
+  else
+  {
+    // N sectors starting at kilometer count Y
+    uint32_t start_km = atoi(argv[1]);
+    while (start_sector > 16)
+    {
+      eventlog_store_t entries[2];
+      int status = filesystem_read(start_sector, (uint8_t*)&entries, sizeof(entries));
+      if (status < 0 || entries[0].log.alltime_distance_m < start_km * 1000) break;
+
+      start_sector -= 16;
+    }
+  }
+
   for (int i = 0; i < num_sectors; i++)
   {
     eventlog_store_t entries[2];
@@ -262,11 +280,19 @@ static void cmd_readlog(BaseSequentialStream *chp, int argc, char *argv[])
 
     if (status > 0)
     {
+      if (i == 0)
+      {
+        chprintf(chp, "# Sector %d, systime %d ms, total distance %d m\n",
+          (int)start_sector, (int)entries[0].log.systime, (int)entries[0].log.alltime_distance_m);
+      }
+
       for (int j = 0; j < 2; j++)
       {
-        for (int k = 0; k < 64; k++)
+        const uint8_t *p = (const uint8_t*)&entries[j];
+        for (int k = 0; k < sizeof(eventlog_t) / 4; k++)
         {
-          chprintf(chp, "%08x", (unsigned)entries[j].raw[k]);
+          chprintf(chp, "%02x%02x%02x%02x", p[0], p[1], p[2], p[3]);
+          p += 4;
           chThdSleepMilliseconds(1);
         }
         chprintf(chp, "\n");

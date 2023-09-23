@@ -91,7 +91,7 @@ void log_writer_thread(void *p)
       logentry.log.trip_distance_m = wheel_speed_get_distance();
       logentry.log.wheel_velocity = wheel_speed_get_velocity();
       logentry.log.wheel_accel = wheel_speed_get_acceleration();
-      logentry.log.motor_rpm = motor_orientation_get_fast_rpm();
+      logentry.log.motor_rpm = motor_orientation_get_rpm();
       logentry.log.motor_target_current = bike_control_get_motor_current();
       logentry.log.battery_voltage = get_battery_voltage_mV() / 1000.0f;
       logentry.log.battery_current = get_battery_current_mA() / 1000.0f;
