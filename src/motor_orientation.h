@@ -16,6 +16,9 @@ void motor_orientation_update();
 // Returns value 0..359
 int motor_orientation_get_angle();
 
+// Unfiltered angle estimate
+int motor_orientation_get_angle_fast();
+
 // Returns instantaneous RPM value or 0 if stopped or not synchronized
 int motor_orientation_get_fast_rpm();
 

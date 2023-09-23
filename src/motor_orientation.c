@@ -24,6 +24,9 @@ static struct {
 
   float filter_rpm;         // Filtered motor speed estimate
   float acceleration;       // Acceleration estimate (RPM/s)
+
+  float filter_angle;       // Filtered orientation estimate
+  float filter_lag;         // Lag of the orientation filter
 } g_hall;
 
 // From main.c, whether motor is connected
@@ -115,8 +118,25 @@ void motor_orientation_update()
     g_hall.prev_time = g_hall.pending_time;
     g_hall.stepcount += delta;
 
-    g_hall.sector_ticks[g_hall.prev_sector] = g_hall.tickcount;
+    g_hall.sector_ticks[g_hall.prev_sector] = g_hall.pending_time;
     g_hall.sector_steps[g_hall.prev_sector] = g_hall.stepcount;
+  }
+
+  // Filter the angle estimate to reduce noise
+  float angle_decay = 0.1f;
+  int fast_angle = motor_orientation_get_angle_fast();
+
+  if (g_hall.filter_rpm == 0 || g_hall.filter_angle != g_hall.filter_angle)
+  {
+    g_hall.filter_angle = fast_angle;
+  }
+  else
+  {
+    int delta_angle = angle_diff(fast_angle, (int)g_hall.filter_angle);
+    g_hall.filter_angle += delta_angle * angle_decay;
+    g_hall.filter_lag += (delta_angle - g_hall.filter_lag) * angle_decay;
+    if (g_hall.filter_angle > 360.0f) g_hall.filter_angle -= 360.0f;
+    if (g_hall.filter_angle < 0.0f) g_hall.filter_angle += 360.0f;
   }
 
   // Filter the motor RPM estimate for less speed critical uses
@@ -168,9 +188,8 @@ static inline void motor_angle_linear_fit(float *a, float *b, uint32_t reftime)
 
 bool motor_spinning()
 {
-  uint32_t last_time = g_hall.sector_ticks[g_hall.prev_sector];
   uint32_t max_ticks_per_sector = (60 * CONTROL_FREQ) / (6 * CTRL_MIN_RPM);
-  return (uint32_t)(g_hall.tickcount - last_time) < max_ticks_per_sector;
+  return (uint32_t)(g_hall.tickcount - g_hall.prev_time) < max_ticks_per_sector;
 }
 
 bool motor_orientation_in_sync()
@@ -186,7 +205,7 @@ bool motor_orientation_in_sync()
   return true;
 }
 
-int motor_orientation_get_angle()
+int motor_orientation_get_angle_fast()
 {
   // Skip interpolation if we are not synchronized to rotation yet
   if (!motor_orientation_in_sync())
@@ -216,6 +235,11 @@ int motor_orientation_get_angle()
     // Linear fit is clearly wrong
     return hall_angle;
   }
+}
+
+int motor_orientation_get_angle()
+{
+  return wrap_angle((int)(g_hall.filter_angle + g_hall.filter_lag));
 }
 
 int motor_orientation_get_hall_angle()

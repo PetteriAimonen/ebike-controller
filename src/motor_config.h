@@ -37,7 +37,7 @@
 #define DUTY_LIMIT_FILTER_RELAX_S   0.5f
 
 // Field oriented control PI loop terms
-#define FOC_P_TERM 0.1f
+#define FOC_P_TERM 0.2f
 #define FOC_I_TERM 0.05f
 
 // Distance in meters per one wheel speed sensor tick.
