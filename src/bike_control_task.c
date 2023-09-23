@@ -205,6 +205,21 @@ static void state_waitmove()
 
 static void state_powered()
 {
+  static float prev_current;
+  static systime_t prev_time;
+  systime_t time_now = chVTGetSystemTime();
+
+  // Compute timestep
+  systime_t delta = time_now - prev_time;
+  if (delta > MS2ST(100)) delta = MS2ST(100);
+  float delta_s = delta / (float)(S2ST(1));
+  
+  if (delta <= MS2ST(100) && prev_current > g_motor_current)
+  {
+    // Resume from previous motor power after very brief brake application
+    g_motor_current = prev_current;
+  }
+
   float wheel_velocity = wheel_speed_get_velocity();
   float wheel_accel = wheel_speed_get_acceleration();
 
@@ -226,14 +241,6 @@ static void state_powered()
     g_bike_state = STATE_BOOT;
     return;
   }
-  
-  // Compute timestep
-  static systime_t prev_time;
-  systime_t time_now = chVTGetSystemTime();
-  systime_t delta = time_now - prev_time;
-  if (delta > MS2ST(100)) delta = MS2ST(100);
-  float delta_s = delta / (float)(S2ST(1));
-  prev_time = time_now;
   
   // Lowpass filter will be applied to target current
   float target_current = 0.0f;
@@ -325,17 +332,16 @@ static void state_powered()
   {
     g_motor_current = max_current;
   }
+
+  prev_time = time_now;
+  prev_current = g_motor_current;
 }
 
 static void update_leds()
 {
-  static int brake_time = 0;
-
   if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
   {
-    brake_time++;
-
-    if (brake_time < 200)
+    if (g_acceleration < -BIKE_BRAKE_THRESHOLD_M_S2)
     {
       for (int i = 0; i < 54; i++)
       {
@@ -354,8 +360,6 @@ static void update_leds()
   }
   else
   {
-    brake_time = 0;
-
     // Rear end lights
     for (int i = 0; i < 17; i++)
     {
