@@ -4,6 +4,7 @@
 #include "sensor_task.h"
 #include "lsm6ds3.h"
 #include "debug.h"
+#include "log_task.h"
 
 static volatile float g_accel_x, g_accel_y, g_accel_z;
 static volatile float g_gyro_x, g_gyro_y, g_gyro_z;
@@ -46,7 +47,7 @@ static void sensor_thread(void *p)
   lsm6ds3_write(LSM6DS3_CTRL3_C, 0x01); // Reset the chip
   
   // Enable 3-wire SPI mode
-  lsm6ds3_write(LSM6DS3_CTRL3_C, 0x08);
+  lsm6ds3_write(LSM6DS3_CTRL3_C, 0x4C); // Block data update, auto-increment read
   lsm6ds3_write(LSM6DS3_CTRL4_C, 0x04);
   
   uint8_t id = lsm6ds3_read(LSM6DS3_WHOAMI);
@@ -103,6 +104,11 @@ static void sensor_thread(void *p)
     {
       ticks_since_last_sample++;
       
+      if (ticks_since_last_sample > 5)
+      {
+        log_event(EVENT_ACCEL_READ_FAIL);
+      }
+
       if (ticks_since_last_sample > 50)
       {
         abort_with_error("ACC_WDOG");
