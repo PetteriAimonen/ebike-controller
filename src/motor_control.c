@@ -10,6 +10,7 @@
 #include "motor_sampling.h"
 #include "motor_limits.h"
 #include "wheel_speed.h"
+#include "log_task.h"
 
 // Some useful constants
 static const float f_pi = 3.14159265f;
@@ -78,7 +79,7 @@ float complex get_current_vector()
 {
   int phase1_mA, phase3_mA;
   motor_get_currents(&phase1_mA, &phase3_mA);
-  
+
   float phase1_A = phase1_mA;
   float phase3_A = phase3_mA;
   float phase2_A = -(phase1_A + phase3_A);
@@ -95,7 +96,8 @@ float complex get_current_vector()
 static void do_field_oriented_control(bool do_modulation)
 {
   // Get vector for rotor orientation
-  float rotor_angle = motor_orientation_get_angle() + g_foc_advance;
+  int angle_raw = motor_orientation_get_angle();
+  float rotor_angle = angle_raw + g_foc_advance;
   float complex rotor_vector = cexpf(I * f_pi / 180.0f * rotor_angle);
   
   // Project the current vector to rotor coordinates
@@ -103,9 +105,18 @@ static void do_field_oriented_control(bool do_modulation)
   current *= conjf(rotor_vector);
   g_debug_latest_I_vector = current;
   
+  if (cabsf(current) > MOTOR_ABSMAX_CURRENT)
+  {
+    log_event(EVENT_MOTOR_OVERCURRENT);
+    
+    set_modulation_vector(0);
+    g_foc_I_accumulator = 0.0f;
+    return;
+  }
+
   // Report input data over SWO pin
   // ITM->PORT[ITM_BATTVOLTAGE].u16 = get_battery_voltage_mV();
-  ITM->PORT[ITM_ORIENTATION].u16 = motor_orientation_get_angle();
+  ITM->PORT[ITM_ORIENTATION].u16 = angle_raw;
   ITM->PORT[ITM_HALLSECTOR].u8 = motor_orientation_get_hall_sector();
   // ITM->PORT[ITM_TARGETCURRENT].u16 = g_foc_torque_current;
 
@@ -115,7 +126,7 @@ static void do_field_oriented_control(bool do_modulation)
   float complex reference = I * g_foc_torque_current * motor_limits_get_fraction();
 
   // Add small amount of holding current for stability
-  reference += 0.1f;
+  reference += MOTOR_HOLDING_CURRENT;
 
   float complex error = reference - current;
   g_foc_I_accumulator += FOC_I_TERM * error;
@@ -127,6 +138,7 @@ static void do_field_oriented_control(bool do_modulation)
   {
     // Value has saturated
     voltage /= vabs;
+    log_event(EVENT_VOLTAGE_SATURATED);
   }
   
   float iabs = cabsf(g_foc_I_accumulator);
@@ -134,6 +146,7 @@ static void do_field_oriented_control(bool do_modulation)
   {
     // Prevent integrator windup
     g_foc_I_accumulator *= MAX_MOTOR_CURRENT / iabs;
+    log_event(EVENT_CURRENT_SATURATED);
   }
   
   g_debug_latest_U_vector = voltage;
@@ -158,6 +171,8 @@ static void do_field_oriented_control(bool do_modulation)
 
 CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
 {
+  uint32_t start = DWT->CYCCNT;
+
   TIM1->SR &= ~TIM_SR_UIF;
   
   wheel_speed_update();
@@ -172,7 +187,12 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
     ADC1->CR2 |= ADC_CR2_JSWSTART;
   }
   
-  if (g_foc_enabled)
+  if (palReadPad(GPIOB, GPIOB_FAULT) == 0)
+  {
+    log_event(EVENT_DRV_FAULT);
+    set_modulation_vector(0);
+  }
+  else if (g_foc_enabled)
   {
     // Do FOC commutation
     do_field_oriented_control(true);
@@ -198,7 +218,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM1_UP_HANDLER)
   TIM3->CNT = 10;
   TIM3->CR1 |= TIM_CR1_CEN;
   
-  int irq_time = TIM1->CNT;
+  uint32_t irq_time = DWT->CYCCNT - start;
   if (irq_time > g_interrupt_time)
       g_interrupt_time = irq_time;
 }
@@ -214,6 +234,16 @@ void get_foc_debug(float complex *i_vector, float complex *u_vector)
   *u_vector = g_debug_latest_U_vector;
 }
 
+float motor_get_voltage_abs()
+{
+  return cabsf(g_debug_latest_U_vector);
+}
+
+float motor_get_current_abs()
+{
+  return cabsf(g_debug_latest_I_vector);
+}
+
 void motor_run(int torque_current_mA, int advance_deg)
 {
   if (torque_current_mA < -MAX_MOTOR_CURRENT) torque_current_mA = -MAX_MOTOR_CURRENT;
@@ -223,6 +253,7 @@ void motor_run(int torque_current_mA, int advance_deg)
   g_foc_enabled = true;
   TIM1->BDTR |= TIM_BDTR_MOE;
   TIM3->CCR1 = 1;
+  log_event(EVENT_MOTOR_RUN);
 }
 
 void motor_stop()
@@ -232,6 +263,8 @@ void motor_stop()
   g_foc_enabled = false;
   TIM1->BDTR &= ~TIM_BDTR_MOE; // Let the motor freewheel
   TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = 0;
+
+  log_event(EVENT_MOTOR_STOP);
 
   if (palReadPad(GPIOB, GPIOB_FAULT) == 0)
   {
@@ -244,6 +277,9 @@ void motor_stop()
 
 void start_motor_control()
 {
+  // Enable DWT counter to track interrupt time
+  DWT->CTRL |= (1 << DWT_CTRL_CYCCNTENA_Pos);
+
   g_foc_enabled = false;
   g_foc_torque_current = 0.0f;
   g_foc_I_accumulator = 0.0f;

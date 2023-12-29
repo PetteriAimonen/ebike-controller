@@ -321,6 +321,10 @@ static void ui_thread(void *p)
         button2 = ui_get_button();
     }
 
+    if (button == '+') log_event(EVENT_BUTTON_PLUS);
+    if (button == '-') log_event(EVENT_BUTTON_MINUS);
+    if (button == 'K') log_event(EVENT_BUTTON_OK);
+
     // Keep track how many milliseconds button is pressed for
     if (prevButton == ' ' && button != ' ')
     {

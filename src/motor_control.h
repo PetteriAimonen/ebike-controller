@@ -19,3 +19,5 @@ void stop_motor_control();
 // Debugging information
 void get_foc_debug(float complex *i_vector, float complex *u_vector);
 int motor_get_interrupt_time();
+float motor_get_voltage_abs();
+float motor_get_current_abs();

@@ -24,7 +24,8 @@
 #define SHUNT_uA_PER_ADC_VAL 16113
 
 // Maximum motor current (mA)
-#define MAX_MOTOR_CURRENT 15000
+#define MAX_MOTOR_CURRENT 20000
+#define MOTOR_ABSMAX_CURRENT      30000
 
 // Filter time for motor RPM estimate, in number of sectors
 #define MOTOR_RPM_FILTER_SECTORS 6
@@ -46,6 +47,9 @@
 
 #define MOTOR_ORIENTATION_FILTER_TIME 0.1f
 
+// Small amount of holding current for stability at low loads (mA)
+#define MOTOR_HOLDING_CURRENT 50.0f
+
 // Maximum and minimum RPM for motor control purposes
 // Motor speed is assumed to be unknown if it is outside these limits
 #define CTRL_MIN_RPM 100
@@ -64,6 +68,7 @@
 #define BATTERY_MIN_VOLTAGE_B     30000
 #define BATTERY_MAX_CURRENT_A      6000
 #define BATTERY_MAX_CURRENT_B      8000
+
 
 // Maximum acceleration, as time in seconds from 0 to max RPM
 // #define MOTOR_MIN_ACCEL_TIME    5.0f

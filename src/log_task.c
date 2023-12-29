@@ -13,6 +13,7 @@
 #include "wheel_speed.h"
 #include "bike_control_task.h"
 #include "settings.h"
+#include "motor_control.h"
 
 static uint8_t g_logbuffer1[4096];
 static uint8_t g_logbuffer2[4096];
@@ -20,9 +21,15 @@ static THD_WORKING_AREA(logsaverstack, 1024);
 static THD_WORKING_AREA(logwriterstack, 1024);
 static thread_t *g_logsaver;
 static int g_fileindex = -1;
+static volatile uint32_t g_log_events = 0;
 
 #define EVENT_BUF1 1
 #define EVENT_BUF2 2
+
+void log_event(log_eventtype_t event)
+{
+  __atomic_or_fetch(&g_log_events, event, __ATOMIC_ACQUIRE);
+}
 
 void log_saver_thread(void *p)
 {
@@ -92,7 +99,7 @@ void log_writer_thread(void *p)
       logentry.log.wheel_velocity = wheel_speed_get_velocity();
       logentry.log.wheel_accel = wheel_speed_get_acceleration();
       logentry.log.motor_rpm = motor_orientation_get_rpm();
-      logentry.log.motor_target_current = bike_control_get_motor_current();
+      logentry.log.motor_target_current = bike_control_get_motor_current() / 1000.0f;
       logentry.log.battery_voltage = get_battery_voltage_mV() / 1000.0f;
       logentry.log.battery_current = get_battery_current_mA() / 1000.0f;
       logentry.log.mosfet_temperature = get_mosfet_temperature_mC() / 1000.0f;
@@ -103,6 +110,10 @@ void log_writer_thread(void *p)
       logentry.log.motor_angle = motor_orientation_get_angle();
       logentry.log.hall_angle = motor_orientation_get_hall_angle();
       logentry.log.assist_level = ui_get_assist_level();
+      logentry.log.events = __atomic_fetch_and(&g_log_events, 0, __ATOMIC_ACQUIRE);
+      logentry.log.irq_time = motor_get_interrupt_time();
+      logentry.log.motor_voltage = motor_get_voltage_abs();
+      logentry.log.motor_current = motor_get_current_abs() / 1000.0f;
 
       logentry.log.checksum = compute_checksum(&logentry);
 

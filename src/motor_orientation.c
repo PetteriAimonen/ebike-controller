@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "debug.h"
+#include "log_task.h"
 #include "settings.h"
 #include "motor_config.h"
 #include "motor_orientation.h"
@@ -89,6 +90,12 @@ void motor_orientation_update()
   if (g_hall.pending_sector < 0 && ticks_pending > HALL_TIMEOUT)
   {
     g_hall.filter_rpm = 0;
+    log_event(EVENT_HALL_INVALID_LONG);
+  }
+
+  if (g_hall.pending_sector < 0)
+  {
+    log_event(EVENT_HALL_INVALID_SHORT);
   }
 
   // Filter for short glitches and detect sector change
@@ -105,10 +112,14 @@ void motor_orientation_update()
     // Check rotation direction and the angle at sector boundary
     if (delta > 0)
     {
+      if (g_hall.prev_direction < 0) log_event(EVENT_HALL_REVERSAL);
+
       g_hall.prev_direction = 1;
     }
     else
     {
+      if (g_hall.prev_direction > 0) log_event(EVENT_HALL_REVERSAL);
+
       g_hall.prev_direction = -1;
     }
     
@@ -123,7 +134,7 @@ void motor_orientation_update()
   }
 
   // Filter the angle estimate to reduce noise
-  float angle_decay = 0.1f;
+  float angle_decay = 0.2f;
   int fast_angle = motor_orientation_get_angle_fast();
 
   if (g_hall.filter_rpm == 0 || g_hall.filter_angle != g_hall.filter_angle)
@@ -210,6 +221,7 @@ int motor_orientation_get_angle_fast()
   // Skip interpolation if we are not synchronized to rotation yet
   if (!motor_orientation_in_sync())
   {
+    log_event(EVENT_HALL_UNSYNCED1);
     return motor_orientation_get_hall_angle();
   }
 
@@ -233,6 +245,7 @@ int motor_orientation_get_angle_fast()
   else
   {
     // Linear fit is clearly wrong
+    log_event(EVENT_HALL_UNSYNCED2);
     return hall_angle;
   }
 }
@@ -244,7 +257,7 @@ int motor_orientation_get_angle()
 
 int motor_orientation_get_hall_angle()
 {
-  return sector_to_angle(g_hall.prev_sector + 0.5f * g_hall.prev_direction);
+  return sector_to_angle(g_hall.prev_sector + 0.5f);
 }
 
 int motor_orientation_get_fast_rpm()
@@ -266,6 +279,7 @@ int motor_orientation_get_fast_rpm()
   }
   else
   {
+    log_event(EVENT_HALL_UNSYNCED3);
     return 0;
   }
 }

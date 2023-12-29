@@ -10,6 +10,7 @@
 #include "ui_task.h"
 #include "settings.h"
 #include "ws2812.h"
+#include "log_task.h"
 
 static THD_WORKING_AREA(bikestack, 1024);
 
@@ -339,10 +340,17 @@ static void state_powered()
 
 static void update_leds()
 {
+  static bool was_brake;
+
   if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
   {
-    if (g_acceleration < -BIKE_BRAKE_THRESHOLD_M_S2)
+    float threshold = -BIKE_BRAKE_THRESHOLD_M_S2;
+    if (was_brake) threshold *= 0.5f;
+    if (g_acceleration < threshold)
     {
+      was_brake = true;
+      log_event(EVENT_BRAKELIGHT);
+
       for (int i = 0; i < 54; i++)
       {
         // Brake lights
@@ -351,6 +359,8 @@ static void update_leds()
     }
     else
     {
+      was_brake = false;
+
       for (int i = 0; i < 54; i++)
       {
         // Dimmer brake lights
@@ -361,6 +371,7 @@ static void update_leds()
   else
   {
     // Rear end lights
+    was_brake = false;
     for (int i = 0; i < 17; i++)
     {
       if (i > 2)
@@ -439,11 +450,13 @@ static void bike_control_thread(void *p)
     
     if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
     {
+      log_event(EVENT_BRAKE);
       g_bike_state = STATE_BRAKING;
     }
 
     if (x > 500 || x < -500)
     {
+      log_event(EVENT_TILT);
       g_bike_state = STATE_BRAKING;
     }
 

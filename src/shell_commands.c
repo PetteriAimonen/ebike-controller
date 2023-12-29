@@ -275,6 +275,8 @@ static void cmd_readlog(BaseSequentialStream *chp, int argc, char *argv[])
 
   for (int i = 0; i < num_sectors; i++)
   {
+    if (start_sector + i >= g_system_state.sd_log_sector) break;
+
     eventlog_store_t entries[2];
     int status = filesystem_read(start_sector + i, (uint8_t*)&entries, sizeof(entries));
 
