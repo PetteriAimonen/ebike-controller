@@ -109,6 +109,7 @@ int main(void)
         if (!g_have_motor)
         {
           motor_sampling_update_voltage();
+          bike_control_update_leds(); // For battery status
         }
 
         palClearPad(GPIOC, GPIOC_LED_GREEN);

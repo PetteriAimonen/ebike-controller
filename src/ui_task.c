@@ -280,7 +280,11 @@ static void ui_thread(void *p)
     u8g_DrawStr(&u8g, 0, 60, "jpa@kapsi.fi");
   } while (u8g_NextPage(&u8g));
   
-  chThdSleepMilliseconds(5000);
+  for (int i = 0; i < 500; i++)
+  {
+    chThdSleepMilliseconds(10);
+    if (ui_get_button() != ' ') break;
+  }
   
   if (get_battery_voltage_mV() > 40000)
   {

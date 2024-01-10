@@ -5,6 +5,7 @@
 #include "motor_control.h"
 #include "motor_config.h"
 #include "motor_orientation.h"
+#include "motor_sampling.h"
 #include "wheel_speed.h"
 #include "sensor_task.h"
 #include "ui_task.h"
@@ -338,14 +339,14 @@ static void state_powered()
   prev_current = g_motor_current;
 }
 
-static void update_leds()
+void bike_control_update_leds()
 {
   static bool was_brake;
 
   if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
   {
     float threshold = -BIKE_BRAKE_THRESHOLD_M_S2;
-    if (was_brake) threshold *= 0.5f;
+    if (!was_brake) threshold *= 2.0f;
     if (g_acceleration < threshold)
     {
       was_brake = true;
@@ -388,18 +389,46 @@ static void update_leds()
 
     // Power level indicator lights
     float ratio = g_motor_current / g_system_state.max_motor_current_A;
+    float ratio_actual = motor_get_current_abs() / (1000.0f * g_system_state.max_motor_current_A);
     for (int i = 0; i < 10; i++)
     {
-      if (ratio > i * 0.1f)
+      if (ratio_actual > i * 0.1f)
       {
+        // Actual current delivered to motor
         ws2812_write_led(26 - 17 - i, 64, 32, 0);
         ws2812_write_led(27 + 17 + i, 64, 32, 0);
+      }
+      else if (ratio > i * 0.1f)
+      {
+        // Target current which is not achieved due to motor/battery limits
+        ws2812_write_led(26 - 17 - i, 16, 8, 0);
+        ws2812_write_led(27 + 17 + i, 16, 8, 0);
       }
       else
       {
         ws2812_write_led(26 - 17 - i, 0, 0, 0);
         ws2812_write_led(27 + 17 + i, 0, 0, 0);
       }
+    }
+  }
+  
+  int battery_mV = get_battery_voltage_mV();
+  if (battery_mV <= g_system_state.min_voltage_V * 1000)
+  {
+    // Turn off some rear leds to indicate very low battery
+    for (int i = 0; i <= 9; i += 2)
+    {
+      ws2812_write_led(26 - i, 0, 0, 0);
+      ws2812_write_led(27 + i, 0, 0, 0);
+    }
+  }
+  else if (battery_mV <= BATTERY_VOLTAGE_WARN)
+  {
+    // Turn off a few rear leds to indicate low battery
+    for (int i = 0; i < 5; i += 2)
+    {
+      ws2812_write_led(26 - i, 0, 0, 0);
+      ws2812_write_led(27 + i, 0, 0, 0);
     }
   }
 }
@@ -412,19 +441,54 @@ static void bike_control_thread(void *p)
   
   chRegSetThreadName("bike_ctrl");
   
-  /* Make a boot sound */
-  for (int j = 0; j < 2; j++)
+  int battery_mV = get_battery_voltage_mV();
+  if (battery_mV < BATTERY_VOLTAGE_WARN)
   {
+    /* Sad sound for low battery */
     chThdSleepMilliseconds(100);
-    for (int i = 0; i < 25; i++)
+    for (int i = 0; i < 500/4; i++)
     {
-      motor_run(700, 0);
-      chThdSleepMilliseconds(1);
-      motor_run(-700, 0);
-      chThdSleepMilliseconds(1);
+      motor_run(2000, 0);
+      chThdSleepMilliseconds(2);
+      motor_run(-2000, 0);
+      chThdSleepMilliseconds(2);
     }
+    motor_stop();
+    chThdSleepMilliseconds(100);
+    for (int i = 0; i < 500/6; i++)
+    {
+      motor_run(2000, 0);
+      chThdSleepMilliseconds(3);
+      motor_run(-2000, 0);
+      chThdSleepMilliseconds(3);
+    }
+    motor_stop();
+    chThdSleepMilliseconds(100);
+    for (int i = 0; i < 500/8; i++)
+    {
+      motor_run(2000, 0);
+      chThdSleepMilliseconds(4);
+      motor_run(-2000, 0);
+      chThdSleepMilliseconds(4);
+    }
+    motor_stop();
   }
-  motor_stop();
+  else
+  {
+    /* Normal boot sound */
+    for (int j = 0; j < 2; j++)
+    {
+      chThdSleepMilliseconds(100);
+      for (int i = 0; i < 25; i++)
+      {
+        motor_run(700, 0);
+        chThdSleepMilliseconds(1);
+        motor_run(-700, 0);
+        chThdSleepMilliseconds(1);
+      }
+    }
+    motor_stop();
+  }
   
   bool was_stopped = false;
 
@@ -488,7 +552,7 @@ static void bike_control_thread(void *p)
       motor_stop();
     }
 
-    update_leds();
+    bike_control_update_leds();
   }
 }
 
