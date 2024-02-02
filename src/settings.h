@@ -32,6 +32,7 @@ typedef struct
   int max_krpm;
   int accel_time;
   uint32_t sd_log_sector;
+  int battery_esr_mohm;
 } system_state_t;
 
 // Constant size struct with padding for flash storage

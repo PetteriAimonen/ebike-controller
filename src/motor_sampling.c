@@ -5,6 +5,7 @@
 #include <chprintf.h>
 #include <string.h>
 #include "debug.h"
+#include "settings.h"
 #include "motor_config.h"
 #include "motor_control.h"
 #include "motor_sampling.h"
@@ -37,17 +38,20 @@ void motor_sampling_init()
   ADC1->CR1 = ADC2->CR1 = ADC_CR1_SCAN;
   ADC1->CR2 = ADC2->CR2 = ADC_CR2_ADON;
   
-  // 3 cycle sampling for all channels
+  // 3 cycle sampling for current measurement, 15 cycle for other channels
   ADC1->SMPR1 = ADC2->SMPR1 = 0;
   ADC1->SMPR2 = ADC2->SMPR2 = 0;
   
+  ADC1->SMPR1 |= (1 << 6); // Ch12
+  ADC2->SMPR2 |= (1 << 9); // Ch3
+
   // ADC1 sequence:
-  // Ch9: BR_SO1, Ch12: AN_IN, Ch3: ADC_TEMP
-  ADC1->JSQR = (2 << 20) | (9 << 5) | (12 << 10) | (3 << 15);
+  // Ch9: BR_SO1, Ch12: AN_IN
+  ADC1->JSQR = (1 << 20) | (9 << 10) | (12 << 15);
   
   // ADC2 sequence:
-  // Ch8: BR_SO2, Ch10: TEMP_MOTOR
-  ADC2->JSQR = (1 << 20) | (8 << 10) | (10 << 15);
+  // Ch8: BR_SO2, Ch3: ADC_TEMP
+  ADC2->JSQR = (1 << 20) | (8 << 10) | (3 << 15);
   
   // Injected sequence trigger on TIM1 CC4 rising edge
   ADC1->CR2 = ADC_CR2_JEXTEN_0 | ADC_CR2_ADON;
@@ -126,31 +130,20 @@ static float ntc_to_millicelsius(float ohms_25C, float beta, float adc_ohms)
   return 1000.0f * (T - 273.15f);
 }
 
-void motor_sampling_update_voltage()
-{
-  /* Estimate battery voltage */
-  float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
-  g_battery_voltage = mV;
-
-  if (!(TIM1->CR1 & TIM_CR1_CEN))
-  {
-    ADC1->CR2 |= ADC_CR2_JSWSTART;
-  }
-}
-
 void motor_sampling_update()
 {
   float decay = 1.0f / (MOTOR_FILTER_TIME_S * CONTROL_FREQ);
-  
-  /* Estimate battery voltage */
-  float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
-  g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
+
+  if (!(TIM1->CR1 & TIM_CR1_CEN))
+  {
+    decay = 0.01f;
+    ADC1->CR2 |= ADC_CR2_JSWSTART;
+  }
   
   /* Estimate phase voltages */
-  float pwm_max = TIM1->ARR;
-  float ph3 = TIM1->CCR1 / pwm_max;
-  float ph2 = TIM1->CCR2 / pwm_max;
-  float ph1 = TIM1->CCR3 / pwm_max;
+  float ph3 = TIM1->CCR1 / PWM_MAX;
+  float ph2 = TIM1->CCR2 / PWM_MAX;
+  float ph1 = TIM1->CCR3 / PWM_MAX;
   float vgnd = (ph1 + ph2 + ph3) / 3.0f;
   ph1 -= vgnd;
   ph2 -= vgnd;
@@ -164,27 +157,23 @@ void motor_sampling_update()
   if (mA < -20000) mA = 0; // Fault state disables current reading
   g_battery_current = g_battery_current * (1 - decay) + mA * decay;
   
+  /* Estimate battery voltage */
+  float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
+  mV *= 1.01f; // ADC seems to consistently read a bit low
+  float esr_drop_mV = (g_battery_current / 1000.0f) * g_system_state.battery_esr_mohm;
+  if (esr_drop_mV > 2000) esr_drop_mV = 2000;
+  if (esr_drop_mV < -1000) esr_drop_mV = -1000;
+  mV += esr_drop_mV;
+  if (g_battery_voltage == 0) g_mosfet_temperature = mV;
+  g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
+
   /* Estimate MOSFET temperature */
   // adc_val = 4096 * 10k / (10k + ntc)
   // =>  ntc = (4096 * 10k) / adc_val - 10k
-  float ohms = (4096.0f * 10000.0f) / ADC1->JDR3 - 10000.0f;
+  float ohms = (4096.0f * 10000.0f) / ADC2->JDR2 - 10000.0f;
   float mC = ntc_to_millicelsius(10000, 3428, ohms);
+  if (g_mosfet_temperature == 0) g_mosfet_temperature = mC;
   g_mosfet_temperature = g_mosfet_temperature * (1 - decay) + mC * decay;
-  
-  /* Estimate motor temperature */
-  // adc_val = 5/3.3 * 4096 * 4.7k / (4.7k + ntc)
-  // =>  ntc = (5/3.3 * 4096 * 4.7k) / adc_val - 4.7k
-  int adc = ADC2->JDR2;
-  if (adc < 50 || adc > 4050)
-  {
-    mC = 999999;
-  }
-  else
-  {
-    ohms = (5.0f/3.3f * 4096.0f * 4700.0f) / adc - 4700.0f;
-    mC = ntc_to_millicelsius(10000, 3428, ohms);
-  }
-  g_motor_temperature = g_motor_temperature * (1 - decay) + mC * decay;
 }
 
 int get_battery_current_mA()

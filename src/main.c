@@ -108,14 +108,11 @@ int main(void)
     {
         if (!g_have_motor)
         {
-          motor_sampling_update_voltage();
+          motor_sampling_update();
           bike_control_update_leds(); // For battery status
         }
 
-        palClearPad(GPIOC, GPIOC_LED_GREEN);
-        chThdSleepMilliseconds(500);
-        palSetPad(GPIOC, GPIOC_LED_GREEN);
-        chThdSleepMilliseconds(500);
+        chThdSleepMilliseconds(5);
         
         check_usb_usart();
     }

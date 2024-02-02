@@ -117,6 +117,7 @@ void load_system_state()
   if (g_system_state.torque_N_per_A == 0) g_system_state.torque_N_per_A = 5;
   if (g_system_state.max_krpm == 0) g_system_state.max_krpm = 10;
   if (g_system_state.accel_time == 0) g_system_state.accel_time = 5;
+  if (g_system_state.battery_esr_mohm == 0) g_system_state.battery_esr_mohm = 100;
 }
 
 void save_system_state()

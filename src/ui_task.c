@@ -110,7 +110,7 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
-  int entries = 20;
+  int entries = 21;
 
   if (!editing)
   {
@@ -145,10 +145,11 @@ static bool config_page(char button)
     config_entry(13, selected, editing, "Ped.Sens", &g_system_state.has_pedal_sensor, delta);
     config_entry(14, selected, editing, "Max.kRPM", &g_system_state.max_krpm, delta);
     config_entry(15, selected, editing, "Acc.time", &g_system_state.accel_time, delta);
+    config_entry(16, selected, editing, "Batt.ESR", &g_system_state.battery_esr_mohm, delta * 10);
 
-    config_entry(16, selected, editing, "Hall in.", &hall_in, delta);
-    config_entry(17, selected, editing, "Temperat", &temperature, delta);
-    config_entry(18, selected, editing, "Brake", &brake, delta);
+    config_entry(17, selected, editing, "Hall in.", &hall_in, delta);
+    config_entry(18, selected, editing, "Temperat", &temperature, delta);
+    config_entry(19, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 
@@ -286,8 +287,9 @@ static void ui_thread(void *p)
     if (ui_get_button() != ' ') break;
   }
   
-  if (get_battery_voltage_mV() > 40000)
+  if (get_battery_voltage_mV() > 39500)
   {
+    // Battery fully charged
     g_system_state.total_distance_m = 0;
     g_system_state.total_energy_mJ = 0;
     g_system_state.total_time_ms = 0;
