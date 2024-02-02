@@ -388,8 +388,13 @@ void bike_control_update_leds()
     }
 
     // Power level indicator lights
-    float ratio = g_motor_current / g_system_state.max_motor_current_A;
-    float ratio_actual = motor_get_current_abs() / (1000.0f * g_system_state.max_motor_current_A);
+    static float actual_current_avg;
+    float ratio_target = g_motor_current / g_system_state.max_motor_current_A;
+    actual_current_avg += ((motor_get_current_abs() / 1000.0f) - actual_current_avg) * 0.1f;
+    float ratio_actual = actual_current_avg / (g_system_state.max_motor_current_A);
+
+    if (fabs(ratio_actual - ratio_target) < 0.1f) ratio_actual = ratio_target;
+
     for (int i = 0; i < 10; i++)
     {
       if (ratio_actual > i * 0.1f)
@@ -398,7 +403,7 @@ void bike_control_update_leds()
         ws2812_write_led(26 - 17 - i, 64, 32, 0);
         ws2812_write_led(27 + 17 + i, 64, 32, 0);
       }
-      else if (ratio > i * 0.1f)
+      else if (ratio_target > i * 0.1f)
       {
         // Target current which is not achieved due to motor/battery limits
         ws2812_write_led(26 - 17 - i, 16, 8, 0);
