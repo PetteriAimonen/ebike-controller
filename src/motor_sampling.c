@@ -141,9 +141,9 @@ void motor_sampling_update()
   }
   
   /* Estimate phase voltages */
-  float ph3 = TIM1->CCR1 / PWM_MAX;
-  float ph2 = TIM1->CCR2 / PWM_MAX;
-  float ph1 = TIM1->CCR3 / PWM_MAX;
+  float ph3 = TIM1->CCR1 / (float)PWM_MAX;
+  float ph2 = TIM1->CCR2 / (float)PWM_MAX;
+  float ph1 = TIM1->CCR3 / (float)PWM_MAX;
   float vgnd = (ph1 + ph2 + ph3) / 3.0f;
   ph1 -= vgnd;
   ph2 -= vgnd;
