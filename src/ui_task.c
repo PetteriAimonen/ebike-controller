@@ -287,7 +287,8 @@ static void ui_thread(void *p)
     if (ui_get_button() != ' ') break;
   }
   
-  if (get_battery_voltage_mV() > 39500)
+  int battery_mV = get_battery_voltage_mV();
+  if (battery_mV > 41000 || (battery_mV > 40000 && g_system_state.total_energy_mJ > 100000000))
   {
     // Battery fully charged
     g_system_state.total_distance_m = 0;
