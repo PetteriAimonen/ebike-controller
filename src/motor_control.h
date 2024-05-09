@@ -13,6 +13,11 @@ void set_motor_pwm(int angle, int duty);
 void motor_run(int torque_current_mA, int advance);
 void motor_stop();
 
+// Enable regenerative braking when rotation RPM is positive
+// and torque current is negative, regardless of brake switch
+// value.
+void motor_set_regen_brake(bool enable);
+
 void start_motor_control();
 void stop_motor_control();
 

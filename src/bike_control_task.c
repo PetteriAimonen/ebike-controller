@@ -183,11 +183,52 @@ static void state_boot()
 
 static void state_braking()
 {
-  g_motor_current = 0.0f;
+  if (g_system_state.max_regen_A > 0)
+  {
+    float kmh = wheel_speed_get_velocity() * 3.6f;
+    float regen_ratio = 0.0f;
+    if (kmh < BIKE_MIN_VELOCITY * 3.6f)
+    {
+      regen_ratio = 0.0f;
+    }
+    else if (kmh < g_system_state.max_speed_kmh)
+    {
+      regen_ratio = 0.5f * kmh / g_system_state.max_speed_kmh;
+    }
+    else
+    {
+      regen_ratio = 0.5f + (kmh - g_system_state.max_speed_kmh) / 4.0f;
+    }
+
+    if (regen_ratio > 1.0f) regen_ratio = 1.0f;
+
+    float regen_current = regen_ratio * g_system_state.max_regen_A;
+    if (regen_current > BIKE_MIN_CURRENT_A)
+    {
+      g_motor_current += (-regen_current - g_motor_current) * 0.05f;
+    }
+    else
+    {
+      g_motor_current = 0.0f;
+    }
+  }
+  else
+  {
+    g_motor_current = 0.0f;
+  }
   
   if (palReadPad(GPIOB, GPIOB_BRAKE) != 0)
   {
-    g_bike_state = STATE_WAITMOVE;
+    if (wheel_speed_get_velocity() < BIKE_MIN_VELOCITY)
+    {
+      g_bike_state = STATE_WAITMOVE;
+      g_motor_current = 0.0f;
+    }
+    else
+    {
+      g_bike_state = STATE_POWERED;
+    }
+
     g_brake_time = chVTGetSystemTime();
     g_brake_pos = wheel_speed_get_tickcount();
   }
@@ -236,9 +277,11 @@ static void state_powered()
     stall_count = 0;
   }
   
-  if (stall_count > 500 || (wheel_velocity < BIKE_MIN_VELOCITY && g_system_state.wheel_speed_ticks_per_rotation >= 6))
+  if (stall_count > 500 ||
+      (wheel_velocity < BIKE_MIN_VELOCITY && g_system_state.wheel_speed_ticks_per_rotation >= 6) ||
+      motor_orientation_get_rpm() < -100)
   {
-    // Wheel is stopped
+    // Wheel is stopped or rotating in reverse
     g_motor_current = 0.0f;
     g_bike_state = STATE_BOOT;
     return;
@@ -549,11 +592,19 @@ static void bike_control_thread(void *p)
     if (g_motor_current > 0)
     {
       was_stopped = false;
+      motor_set_regen_brake(false);
+      motor_run((int)(g_motor_current * 1000.0f), 0);
+    }
+    else if (g_motor_current < 0)
+    {
+      was_stopped = false;
+      motor_set_regen_brake(true);
       motor_run((int)(g_motor_current * 1000.0f), 0);
     }
     else if (!was_stopped)
     {
       was_stopped = true;
+      motor_set_regen_brake(false);
       motor_stop();
     }
 

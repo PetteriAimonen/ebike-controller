@@ -111,7 +111,7 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
-  int entries = 21;
+  int entries = 22;
 
   if (!editing)
   {
@@ -147,10 +147,11 @@ static bool config_page(char button)
     config_entry(14, selected, editing, "Max.kRPM", &g_system_state.max_krpm, delta);
     config_entry(15, selected, editing, "Acc.time", &g_system_state.accel_time, delta);
     config_entry(16, selected, editing, "Batt.ESR", &g_system_state.battery_esr_mohm, delta * 10);
+    config_entry(17, selected, editing, "Regen.A",  &g_system_state.max_regen_A, delta);
 
-    config_entry(17, selected, editing, "Hall in.", &hall_in, delta);
-    config_entry(18, selected, editing, "Temperat", &temperature, delta);
-    config_entry(19, selected, editing, "Brake", &brake, delta);
+    config_entry(18, selected, editing, "Hall in.", &hall_in, delta);
+    config_entry(19, selected, editing, "Temperat", &temperature, delta);
+    config_entry(20, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 

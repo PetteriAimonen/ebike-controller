@@ -71,6 +71,7 @@
 #define BATTERY_MIN_VOLTAGE_B     30000
 #define BATTERY_MAX_CURRENT_A      6000
 #define BATTERY_MAX_CURRENT_B      8000
+#define BATTERY_MAX_REGEN_MV      44000
 
 
 // Maximum acceleration, as time in seconds from 0 to max RPM

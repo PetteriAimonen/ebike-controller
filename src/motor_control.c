@@ -25,6 +25,7 @@ static volatile bool g_foc_enabled = false;
 static float g_foc_torque_current = 0.0f;
 static int g_foc_advance = 0;
 static float complex g_foc_I_accumulator = 0.0f;
+static bool g_enable_regen = false;
 
 // Debug information
 static float complex g_debug_latest_I_vector = 0.0f;
@@ -151,6 +152,41 @@ static void do_field_oriented_control(bool do_modulation)
   
   g_debug_latest_U_vector = voltage;
   
+  // Normally motor is disabled when brake lever is pressed.
+  // When regenerative braking is enabled, it is permitted to have
+  // torque but only if it opposes the rotation.
+  if (g_enable_regen)
+  {
+    int rpm = motor_orientation_get_fast_rpm();
+    bool braking = ((rpm > 0) == (g_foc_torque_current < 0));
+
+    if (braking)
+    {
+      // Check regenerative braking limits
+      if (get_battery_voltage_mV() > BATTERY_MAX_REGEN_MV)
+      {
+        motor_set_regen_brake(false);
+        motor_stop();
+        TIM1->BDTR |= TIM_BDTR_BKE;
+      }
+      else
+      {
+        // Allow regenerative braking even when brake switch is active
+        TIM1->BDTR &= ~TIM_BDTR_BKE;
+      }
+    }
+    else
+    {
+      // Forward torque, require brake switch released
+      TIM1->BDTR |= TIM_BDTR_BKE;
+    }
+  }
+  else
+  {
+    // Regenerative braking disabled
+    TIM1->BDTR |= TIM_BDTR_BKE;
+  }
+
   if (do_modulation)
   {
     // Project voltage vector back to stator coordinates
@@ -272,6 +308,20 @@ void motor_stop()
     chThdSleepMilliseconds(10);
     TIM3->CCR1 = 1;
     chThdSleepMilliseconds(10);
+  }
+}
+
+void motor_set_regen_brake(bool enable)
+{
+  if (enable)
+  {
+    g_enable_regen = true;
+    // Interrupt handler will disable brake switch when appropriate
+  }
+  else
+  {
+    g_enable_regen = false;
+    TIM1->BDTR |= TIM_BDTR_BKE; // Brake switch required
   }
 }
 
