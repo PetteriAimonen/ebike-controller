@@ -19,6 +19,7 @@ static u8g_t u8g = {};
 
 uint8_t u8g_com_i2c_chibios_fn(u8g_t *u8g, uint8_t msg, uint8_t arg_val, void *arg_ptr);
 
+extern bool g_have_motor;
 static int g_assist_level = 50;
 
 int ui_get_assist_level()
@@ -241,12 +242,20 @@ static void status_page(char button)
   
   u8g_FirstPage(&u8g);
   do {
-    // Current time
-    u8g_SetFont(&u8g, u8g_font_courB18);
-    int secs = chVTGetSystemTime() / MS2ST(1000);
-    chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d",
-              secs / 3600, (secs % 3600) / 60, secs % 60);
-    u8g_DrawStr(&u8g, 5, 18, buf);
+    if (g_have_motor)
+    {
+      // Current time
+      u8g_SetFont(&u8g, u8g_font_courB18);
+      int secs = chVTGetSystemTime() / MS2ST(1000);
+      chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d",
+                secs / 3600, (secs % 3600) / 60, secs % 60);
+      u8g_DrawStr(&u8g, 5, 18, buf);
+    }
+    else
+    {
+      u8g_SetFont(&u8g, u8g_font_courB18);
+      u8g_DrawStr(&u8g, 5, 18, "NO MOTOR");
+    }
     
     // Total energy used, assist level
     u8g_SetFont(&u8g, u8g_font_8x13);
@@ -265,6 +274,19 @@ static void status_page(char button)
     chsnprintf(buf, sizeof(buf), "Total: %5d km", g_system_state.alltime_distance_m / 1000);
     u8g_DrawStr(&u8g, 5, 64, buf);
   } while (u8g_NextPage(&u8g));
+}
+
+static void check_battery_full()
+{
+  int battery_mV = get_battery_voltage_mV();
+  if (battery_mV > 41000 || (battery_mV > 40000 && g_system_state.total_energy_mJ > 100000000))
+  {
+    // Battery fully charged
+    g_system_state.total_distance_m = 0;
+    g_system_state.total_energy_mJ = 0;
+    g_system_state.total_time_ms = 0;
+    save_system_state();
+  }
 }
 
 static void ui_thread(void *p)
@@ -287,16 +309,6 @@ static void ui_thread(void *p)
     if (ui_get_button() != ' ') break;
   }
   
-  int battery_mV = get_battery_voltage_mV();
-  if (battery_mV > 41000 || (battery_mV > 40000 && g_system_state.total_energy_mJ > 100000000))
-  {
-    // Battery fully charged
-    g_system_state.total_distance_m = 0;
-    g_system_state.total_energy_mJ = 0;
-    g_system_state.total_time_ms = 0;
-    save_system_state();
-  }
-
   bool is_powerout = (motor_orientation_get_hall_sector() == -2);
   bool in_settings = false;
   systime_t prevTime = chVTGetSystemTime();
@@ -315,6 +327,11 @@ static void ui_thread(void *p)
   {
     iter++;
     chThdSleepMilliseconds(50);
+
+    if (iter < 100)
+    {
+      check_battery_full();
+    }
     
     char button = ui_get_button();
     chThdSleepMilliseconds(20);

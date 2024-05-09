@@ -159,12 +159,11 @@ void motor_sampling_update()
   
   /* Estimate battery voltage */
   float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
-  mV *= 1.01f; // ADC seems to consistently read a bit low
   float esr_drop_mV = (g_battery_current / 1000.0f) * g_system_state.battery_esr_mohm;
   if (esr_drop_mV > 2000) esr_drop_mV = 2000;
   if (esr_drop_mV < -1000) esr_drop_mV = -1000;
   mV += esr_drop_mV;
-  if (g_battery_voltage == 0) g_mosfet_temperature = mV;
+  if (g_battery_voltage == 0) g_battery_voltage = mV;
   g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
 
   /* Estimate MOSFET temperature */
