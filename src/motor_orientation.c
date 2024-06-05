@@ -28,6 +28,8 @@ static struct {
 
   float filter_angle;       // Filtered orientation estimate
   float filter_lag;         // Lag of the orientation filter
+
+  uint32_t reversal_steps;  // Step count when rotation direction changed
 } g_hall;
 
 // From main.c, whether motor is connected
@@ -90,6 +92,7 @@ void motor_orientation_update()
   if (g_hall.pending_sector < 0 && ticks_pending > HALL_TIMEOUT)
   {
     g_hall.filter_rpm = 0;
+    g_hall.reversal_steps = g_hall.stepcount;
     log_event(EVENT_HALL_INVALID_LONG);
   }
 
@@ -112,13 +115,21 @@ void motor_orientation_update()
     // Check rotation direction and the angle at sector boundary
     if (delta > 0)
     {
-      if (g_hall.prev_direction < 0) log_event(EVENT_HALL_REVERSAL);
+      if (g_hall.prev_direction < 0)
+      {
+        log_event(EVENT_HALL_REVERSAL);
+        g_hall.reversal_steps = g_hall.stepcount;
+      }
 
       g_hall.prev_direction = 1;
     }
     else
     {
-      if (g_hall.prev_direction > 0) log_event(EVENT_HALL_REVERSAL);
+      if (g_hall.prev_direction > 0)
+      {
+        log_event(EVENT_HALL_REVERSAL);
+        g_hall.reversal_steps = g_hall.stepcount;
+      }
 
       g_hall.prev_direction = -1;
     }
@@ -205,6 +216,10 @@ bool motor_spinning()
 
 bool motor_orientation_in_sync()
 {
+  // Check that more than 6 steps have passed since start or last reversal
+  uint32_t steps_since_reversal = g_hall.stepcount - g_hall.reversal_steps;
+  if (steps_since_reversal <= 6) return false;
+
   // Check that all sectors have received timestamps recently
   uint32_t max_ticks_per_rotation = (60 * CONTROL_FREQ) / CTRL_MIN_RPM;
   for (int i = 0; i < 6; i++)
