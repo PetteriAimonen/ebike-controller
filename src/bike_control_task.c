@@ -386,6 +386,12 @@ void bike_control_update_leds()
 {
   static bool was_brake;
 
+  if (chVTGetSystemTime() < 8000)
+  {
+    // Let startup battery level indicator stay for a while
+    return;
+  }
+
   if (palReadPad(GPIOB, GPIOB_BRAKE) == 0)
   {
     float threshold = -BIKE_BRAKE_THRESHOLD_M_S2;
@@ -470,7 +476,7 @@ void bike_control_update_leds()
       ws2812_write_led(27 + i, 0, 0, 0);
     }
   }
-  else if (battery_mV <= BATTERY_VOLTAGE_WARN)
+  else if (battery_percent() < BATTERY_LEVEL_WARN)
   {
     // Turn off a few rear leds to indicate low battery
     for (int i = 0; i < 5; i += 2)
@@ -489,8 +495,7 @@ static void bike_control_thread(void *p)
   
   chRegSetThreadName("bike_ctrl");
   
-  int battery_mV = get_battery_voltage_mV();
-  if (battery_mV < BATTERY_VOLTAGE_WARN)
+  if (battery_percent() < BATTERY_LEVEL_WARN)
   {
     /* Sad sound for low battery */
     chThdSleepMilliseconds(100);

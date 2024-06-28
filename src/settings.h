@@ -34,6 +34,7 @@ typedef struct
   uint32_t sd_log_sector;
   int battery_esr_mohm;
   int max_regen_A;
+  int battery_capacity_Wh;
 } system_state_t;
 
 // Constant size struct with padding for flash storage
@@ -47,3 +48,10 @@ extern volatile system_state_t g_system_state;
 
 void load_system_state();
 void save_system_state();
+
+// Returns remaining battery percent
+static int battery_percent()
+{
+  int Wh = g_system_state.total_energy_mJ / 3600000;
+  return 100 - Wh * 100 / g_system_state.battery_capacity_Wh;
+}

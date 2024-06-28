@@ -112,7 +112,7 @@ static bool config_page(char button)
   else if (button == 'K')
     editing = !editing;
 
-  int entries = 22;
+  int entries = 23;
 
   if (!editing)
   {
@@ -132,14 +132,14 @@ static bool config_page(char button)
   u8g_FirstPage(&u8g);
   do {
     config_entry(0,  selected, editing, "Exit", NULL, delta);
-    config_entry(1,  selected, editing, "Acc.bias", &g_system_state.accelerometer_bias_mg, delta);
+    config_entry(1,  selected, editing, "Acc.bias", &g_system_state.accelerometer_bias_mg, delta * 5);
     config_entry(2,  selected, editing, "Acc.val", &acc_z, delta);
     config_entry(3,  selected, editing, "Acc.inv", &g_system_state.accelerometer_invert, delta);
     config_entry(4,  selected, editing, "Min.volt", &g_system_state.min_voltage_V, delta);
     config_entry(5,  selected, editing, "Max.batA", &g_system_state.max_battery_current_A, delta);
     config_entry(6,  selected, editing, "Max.motA", &g_system_state.max_motor_current_A, delta);
     config_entry(7,  selected, editing, "Wheeldia", &g_system_state.wheel_diameter_inch, delta);
-    config_entry(8,  selected, editing, "WeightKG", &g_system_state.bike_weight_kg, delta);
+    config_entry(8,  selected, editing, "WeightKG", &g_system_state.bike_weight_kg, delta * 5);
     config_entry(9,  selected, editing, "WhlTicks", &g_system_state.wheel_speed_ticks_per_rotation, delta);
     config_entry(10, selected, editing, "Max.km/h", &g_system_state.max_speed_kmh, delta);
     config_entry(11, selected, editing, "Torq.N/A", &g_system_state.torque_N_per_A, delta);
@@ -149,10 +149,11 @@ static bool config_page(char button)
     config_entry(15, selected, editing, "Acc.time", &g_system_state.accel_time, delta);
     config_entry(16, selected, editing, "Batt.ESR", &g_system_state.battery_esr_mohm, delta * 10);
     config_entry(17, selected, editing, "Regen.A",  &g_system_state.max_regen_A, delta);
+    config_entry(18, selected, editing, "BatC.Wh",  &g_system_state.battery_capacity_Wh, delta * 10);
 
-    config_entry(18, selected, editing, "Hall in.", &hall_in, delta);
-    config_entry(19, selected, editing, "Temperat", &temperature, delta);
-    config_entry(20, selected, editing, "Brake", &brake, delta);
+    config_entry(19, selected, editing, "Hall in.", &hall_in, delta);
+    config_entry(20, selected, editing, "Temperat", &temperature, delta);
+    config_entry(21, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
 

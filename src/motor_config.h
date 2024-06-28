@@ -55,8 +55,8 @@
 #define CTRL_MIN_RPM 100
 #define CTRL_MAX_RPM 25000
 
-// Warn about battery voltage below this voltage
-#define BATTERY_VOLTAGE_WARN 36000
+// Warn about battery voltage below this percentage
+#define BATTERY_LEVEL_WARN 30
 
 // Maximum motor speed, temperatures and minimum battery voltage
 // For each, A point gives the start of the linear duty lowering,

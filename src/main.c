@@ -68,17 +68,42 @@ int main(void)
     ws2812_init();
     shellInit();
 
+    load_system_state();
+
     start_bluetooth_shell();
     
     filesystem_init();
     sensors_start();
     ui_start();
 
-    // Bootup animation
+    // Bootup animation and battery level display
+    int batt_level = battery_percent() * 17 / 100;
     for (int i = 0; i < 27; i++)
     {
-      ws2812_write_led(26 - i, 64, 0, 0);
-      ws2812_write_led(27 + i, 64, 0, 0);
+      int r = 0, g = 0, b = 0;
+      if (i < 10)
+      {
+        r = 64;
+        g = 0;
+        b = 0;
+      }
+      else if (i - 10 < batt_level)
+      {
+        if (i - 10 < 10)
+        {
+          r = 64;
+          g = 32;
+          b = 0;
+        }
+        else
+        {
+          r = 0;
+          g = 64;
+          b = 0;
+        }
+      }
+      ws2812_write_led(26 - i, r, g, b);
+      ws2812_write_led(27 + i, r, g, b);
       chThdSleepMilliseconds(25);
     }
     
@@ -92,8 +117,6 @@ int main(void)
         g_is_powerout = (motor_orientation_get_hall_sector() == -2);
     }
     
-    load_system_state();
-
     if (g_have_motor)
     {
       start_motor_control();
