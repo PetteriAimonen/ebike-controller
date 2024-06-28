@@ -20,6 +20,7 @@ static u8g_t u8g = {};
 uint8_t u8g_com_i2c_chibios_fn(u8g_t *u8g, uint8_t msg, uint8_t arg_val, void *arg_ptr);
 
 extern bool g_have_motor;
+extern bool g_is_powerout;
 static int g_assist_level = 50;
 
 int ui_get_assist_level()
@@ -171,55 +172,72 @@ static bool config_page(char button)
 
 static void powerout_page(char button)
 {
+  static int control = 0;
   static int voltage = 0;
+  static int current = 1;
 
-  if (button == '+')
-    voltage++;
-  else if (button == '-')
-    voltage--;
+  if (button == 'K')
+  {
+    control = !control;
+  }
+  else if (control == 0)
+  {
+    if (button == '+')
+      voltage++;
+    else if (button == '-')
+      voltage--;
+  }
+  else
+  {
+    if (button == '+')
+      current++;
+    else if (button == '-')
+      current--;
+  }
 
   if (voltage < 0) voltage = 0;
-  if (voltage > 40) voltage = 40;
+  if (voltage > 44) voltage = 44;
+  if (current < -10) current = -10;
+  if (current > 10) current = 10;
 
   int secs = chVTGetSystemTime() / MS2ST(1000);
-    
-  int p1, p3;
-  motor_get_currents(&p1, &p3);
-  int current = -p3 / 100;
-  int abscur = (current < 0) ? -current : current;
   int V_x10 = get_battery_voltage_mV() / 100;
   int Wh_x10 = g_system_state.total_energy_mJ / 360000;
+
+  int current_x100 = get_dcdc_current_mA() / 10;
+  int abscur = (current_x100 < 0) ? -current_x100 : current_x100;
 
   u8g_FirstPage(&u8g);
   do {
     char buf[64];
 
     // Current time
-    u8g_SetFont(&u8g, u8g_font_courB18);
-    chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d",
-              secs / 3600, (secs % 3600) / 60, secs % 60);
-    u8g_DrawStr(&u8g, 5, 18, buf);
+    u8g_SetFont(&u8g, u8g_font_8x13);
+    chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d %2d.%01d V",
+              secs / 3600, (secs % 3600) / 60, secs % 60, V_x10 / 10, V_x10 % 10);
+    u8g_DrawStr(&u8g, 0, 14, buf);
     
     // Output voltage and current
     u8g_SetFont(&u8g, u8g_font_8x13);
-    chsnprintf(buf, sizeof(buf), "Out %2d V, %c%d.%01d A",
-               voltage, (current < 0) ? '-' : '+', abscur / 10, abscur % 10);
-    u8g_DrawStr(&u8g, 0, 34, buf);
-    
-    // Battery volts
-    u8g_SetFont(&u8g, u8g_font_8x13);
-    chsnprintf(buf, sizeof(buf), "Bat: %2d.%01d V",
-               V_x10 / 10, V_x10 % 10);
-    u8g_DrawStr(&u8g, 0, 48, buf);
+    chsnprintf(buf, sizeof(buf),
+              (control == 0) ? "[ %2d V ]  %2d A" : "%2d V  [ %2d A ]",
+               voltage, current);
+    u8g_DrawStr(&u8g, 0, 28, buf);
 
-    // Total energy used, assist level
+    // Output voltage and current
+    u8g_SetFont(&u8g, u8g_font_8x13);
+    chsnprintf(buf, sizeof(buf), "%s %2d.%02d A",
+               (current_x100 >= 0) ? "Out:" : "In: ", abscur / 100, abscur % 100);
+    u8g_DrawStr(&u8g, 0, 42, buf);
+
+    // Total energy used
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "Tot: %3d.%01d Wh",
                Wh_x10 / 10, Wh_x10 % 10);
-    u8g_DrawStr(&u8g, 0, 62, buf);
+    u8g_DrawStr(&u8g, 0, 56, buf);
   } while (u8g_NextPage(&u8g));
 
-  set_dcdc_mode(DCDC_OUTPUT_CCCV, voltage * 1000, 10000);
+  set_dcdc_mode(voltage * 1000, current * 1000);
 }
 
 static void status_page(char button)
@@ -240,14 +258,13 @@ static void status_page(char button)
   int Wh_x10 = g_system_state.total_energy_mJ / 360000;
   int V_x10 = get_battery_voltage_mV() / 100;
   int km_x10 = g_system_state.total_distance_m / 100;
-  
+  int secs = chVTGetSystemTime() / MS2ST(1000);
   u8g_FirstPage(&u8g);
   do {
     if (g_have_motor)
     {
       // Current time
       u8g_SetFont(&u8g, u8g_font_courB18);
-      int secs = chVTGetSystemTime() / MS2ST(1000);
       chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d",
                 secs / 3600, (secs % 3600) / 60, secs % 60);
       u8g_DrawStr(&u8g, 5, 18, buf);
@@ -310,7 +327,6 @@ static void ui_thread(void *p)
     if (ui_get_button() != ' ') break;
   }
   
-  bool is_powerout = (motor_orientation_get_hall_sector() == -2);
   bool in_settings = false;
   systime_t prevTime = chVTGetSystemTime();
   systime_t pressTime = chVTGetSystemTime();
@@ -318,11 +334,6 @@ static void ui_thread(void *p)
   uint32_t iter = 0;
 
   systime_t prev_sysstate_save = chVTGetSystemTime();
-
-  if (is_powerout)
-  {
-    start_dcdc_control();
-  }
 
   while (1)
   {
@@ -375,7 +386,7 @@ static void ui_thread(void *p)
     if (button == prevButton && ms_pressed > 1000 && (button == '+' || button == '-'))
     {
       // Autorepeat
-      if (ms_pressed < 5000)
+      if (ms_pressed < 2000)
       {
         if ((iter & 7) != 0) button = ' ';
       }
@@ -404,7 +415,7 @@ static void ui_thread(void *p)
           prevTime = 0;
         }
       }
-      else if (is_powerout)
+      else if (g_is_powerout)
       {
         powerout_page(button);
       }

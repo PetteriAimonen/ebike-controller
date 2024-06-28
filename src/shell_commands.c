@@ -238,7 +238,7 @@ static void cmd_dcdc_out(BaseSequentialStream *chp, int argc, char *argv[])
   int mA = atoi(argv[1]);
 
   start_dcdc_control();
-  set_dcdc_mode(DCDC_OUTPUT_CCCV, mV, mA);
+  set_dcdc_mode(mV, mA);
 }
 
 static void cmd_readlog(BaseSequentialStream *chp, int argc, char *argv[])

@@ -12,6 +12,9 @@ void motor_sampling_init();
 // Updates value estimates, called by motor_control.
 void motor_sampling_update();
 
+// Updates from raw ADC values, called by dcdc_control.
+void motor_sampling_update_raw(int battery_mA, int vbat_adc, int ntc_adc, float decay);
+
 // Updates just battery voltage, called by main.c when no motor connected
 void motor_sampling_update_voltage();
 

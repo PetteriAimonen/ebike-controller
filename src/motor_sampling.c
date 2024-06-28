@@ -136,40 +136,49 @@ void motor_sampling_update()
 
   if (!(TIM1->CR1 & TIM_CR1_CEN))
   {
+    // Motor control not running
     decay = 0.01f;
     ADC1->CR2 |= ADC_CR2_JSWSTART;
   }
   
+  int ph1_mA, ph3_mA;
+  motor_get_currents(&ph1_mA, &ph3_mA);
+
   /* Estimate phase voltages */
-  float ph3 = TIM1->CCR1 / (float)PWM_MAX;
-  float ph2 = TIM1->CCR2 / (float)PWM_MAX;
-  float ph1 = TIM1->CCR3 / (float)PWM_MAX;
-  float vgnd = (ph1 + ph2 + ph3) / 3.0f;
+  float div = 1.0f / TIM1->ARR;
+  float ph3 = TIM1->CCR1 * div;
+  float ph2 = TIM1->CCR2 * div;
+  float ph1 = TIM1->CCR3 * div;
+  float vgnd = (ph1 + ph2 + ph3) * (1 / 3.0f);
   ph1 -= vgnd;
   ph2 -= vgnd;
   ph3 -= vgnd;
   
   /* Estimate battery current */
-  int i1, i3;
-  motor_get_currents(&i1, &i3);
-  int i2 = -(i1 + i3);
-  float mA = i1 * ph1 + i2 * ph2 + i3 * ph3;
-  if (mA < -20000) mA = 0; // Fault state disables current reading
-  g_battery_current = g_battery_current * (1 - decay) + mA * decay;
+  int ph2_mA = -(ph1_mA + ph3_mA);
+  float battery_mA = ph1_mA * ph1 + ph2_mA * ph2 + ph3_mA * ph3;
+  if (battery_mA < -20000) battery_mA = 0; // Fault state disables current reading
   
+  motor_sampling_update_raw(battery_mA, ADC1->JDR2, ADC2->JDR2, decay);
+}
+
+void motor_sampling_update_raw(int battery_mA, int vbat_adc, int ntc_adc, float decay)
+{
+  g_battery_current = g_battery_current * (1 - decay) + battery_mA * decay;
+
   /* Estimate battery voltage */
-  float mV = ADC1->JDR2 * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
+  float mV = vbat_adc * 3300.0f / 4096 * (39.0f + 2.2f) / 2.2f;
   float esr_drop_mV = (g_battery_current / 1000.0f) * g_system_state.battery_esr_mohm;
   if (esr_drop_mV > 2000) esr_drop_mV = 2000;
   if (esr_drop_mV < -1000) esr_drop_mV = -1000;
   mV += esr_drop_mV;
-  if (g_battery_voltage == 0) g_battery_voltage = mV;
+  if (g_battery_voltage < BATTERY_MIN_VOLTAGE_B) g_battery_voltage = mV;
   g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
 
   /* Estimate MOSFET temperature */
   // adc_val = 4096 * 10k / (10k + ntc)
   // =>  ntc = (4096 * 10k) / adc_val - 10k
-  float ohms = (4096.0f * 10000.0f) / ADC2->JDR2 - 10000.0f;
+  float ohms = (4096.0f * 10000.0f) / ntc_adc - 10000.0f;
   float mC = ntc_to_millicelsius(10000, 3428, ohms);
   if (g_mosfet_temperature == 0) g_mosfet_temperature = mC;
   g_mosfet_temperature = g_mosfet_temperature * (1 - decay) + mC * decay;

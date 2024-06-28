@@ -8,6 +8,7 @@
 #include "motor_control.h"
 #include "motor_orientation.h"
 #include "motor_sampling.h"
+#include "dcdc_control.h"
 #include "log_task.h"
 #include "sensor_task.h"
 #include "bike_control_task.h"
@@ -58,6 +59,7 @@ void enable_trace()
 }
 
 bool g_have_motor;
+bool g_is_powerout;
 
 int main(void)
 {
@@ -87,6 +89,7 @@ int main(void)
         // Retry to make sure
         chThdSleepMilliseconds(100);
         g_have_motor = (motor_orientation_get_hall_sector() >= 0);
+        g_is_powerout = (motor_orientation_get_hall_sector() == -2);
     }
     
     load_system_state();
@@ -97,6 +100,10 @@ int main(void)
       start_log();
       start_bike_control();
     }
+    else if (g_is_powerout)
+    {
+      start_dcdc_control();
+    }
     else
     {
       motor_sampling_init(); // For battery voltage
@@ -106,7 +113,7 @@ int main(void)
     
     while (true)
     {
-        if (!g_have_motor)
+        if (!g_have_motor && !g_is_powerout)
         {
           motor_sampling_update();
           bike_control_update_leds(); // For battery status
