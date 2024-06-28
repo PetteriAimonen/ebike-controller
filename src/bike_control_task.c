@@ -257,11 +257,13 @@ static void state_powered()
   if (delta > MS2ST(100)) delta = MS2ST(100);
   float delta_s = delta / (float)(S2ST(1));
   
+  /*
   if (delta <= MS2ST(100) && prev_current > g_motor_current)
   {
     // Resume from previous motor power after very brief brake application
     g_motor_current = prev_current;
   }
+  */
 
   float wheel_velocity = wheel_speed_get_velocity();
   float wheel_accel = wheel_speed_get_acceleration();
