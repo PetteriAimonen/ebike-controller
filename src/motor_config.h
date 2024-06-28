@@ -33,7 +33,7 @@
 #define MOTOR_RPM_FILTER_TIME_MAX 0.5f
 
 // Filter time for motor temperature and battery currents
-#define MOTOR_FILTER_TIME_S   0.5f
+#define MOTOR_FILTER_TIME_S   0.1f
 #define DUTY_LIMIT_FILTER_TRIP_S   0.1f
 #define DUTY_LIMIT_FILTER_RELAX_S   0.5f
 

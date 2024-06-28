@@ -121,6 +121,11 @@ static void do_field_oriented_control(bool do_modulation)
   ITM->PORT[ITM_HALLSECTOR].u8 = motor_orientation_get_hall_sector();
   // ITM->PORT[ITM_TARGETCURRENT].u16 = g_foc_torque_current;
 
+  // Feedforward based on motor RPM
+  // Value in range -1 to 1
+  int rpm = motor_orientation_get_fast_rpm();
+  float complex feedfwd = I * rpm * (1.0f / CTRL_MAX_RPM);
+
   // Do PI control to match the requested torque
   // Current varies from 0..MAX_MOTOR_CURRENT.
   // The voltage vector length varies 0..1
@@ -131,8 +136,7 @@ static void do_field_oriented_control(bool do_modulation)
 
   float complex error = reference - current;
   g_foc_I_accumulator += FOC_I_TERM * error;
-  float complex voltage = reference + FOC_P_TERM * error + g_foc_I_accumulator;
-  voltage /= MAX_MOTOR_CURRENT;
+  float complex voltage = feedfwd + (FOC_P_TERM * error + g_foc_I_accumulator) * (1.0f / MAX_MOTOR_CURRENT);
   
   float vabs = cabsf(voltage);
   if (vabs > 1.0f)
@@ -157,7 +161,6 @@ static void do_field_oriented_control(bool do_modulation)
   // torque but only if it opposes the rotation.
   if (g_enable_regen)
   {
-    int rpm = motor_orientation_get_fast_rpm();
     bool braking = ((rpm > 0) == (g_foc_torque_current < 0));
 
     if (braking)
@@ -198,7 +201,7 @@ static void do_field_oriented_control(bool do_modulation)
   ITM->PORT[ITM_PWM_CCR1].u16 = TIM1->CCR1;
   ITM->PORT[ITM_PWM_CCR2].u16 = TIM1->CCR2;
   // ITM->PORT[ITM_PWM_CCR3].u16 = TIM1->CCR3;
-  ITM->PORT[ITM_RPM].u16 = motor_orientation_get_fast_rpm();
+  ITM->PORT[ITM_RPM].u16 = rpm;
   ITM->PORT[ITM_ABSCUR].u16 = (uint16_t)(motor_limits_get_fraction() * 100);
   ITM->PORT[ITM_ACCEL].u16 = motor_orientation_get_acceleration();
   // ITM->PORT[ITM_UVECTOR_R].u16 = (int16_t)(crealf(voltage) * 16384.0f);
