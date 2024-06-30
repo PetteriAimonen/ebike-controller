@@ -295,19 +295,6 @@ static void status_page(char button)
   } while (u8g_NextPage(&u8g));
 }
 
-static void check_battery_full()
-{
-  int battery_mV = get_battery_voltage_mV();
-  if (battery_mV > 41000 || (battery_mV > 40000 && g_system_state.total_energy_mJ > 100000000))
-  {
-    // Battery fully charged
-    g_system_state.total_distance_m = 0;
-    g_system_state.total_energy_mJ = 0;
-    g_system_state.total_time_ms = 0;
-    save_system_state();
-  }
-}
-
 static void ui_thread(void *p)
 {
   chRegSetThreadName("ui");
@@ -341,11 +328,6 @@ static void ui_thread(void *p)
     iter++;
     chThdSleepMilliseconds(50);
 
-    if (iter < 100)
-    {
-      check_battery_full();
-    }
-    
     char button = ui_get_button();
     chThdSleepMilliseconds(20);
     char button2 = ui_get_button();

@@ -58,6 +58,57 @@ void enable_trace()
   ITM->TER = 0xFFFFFFFF; // Enable all stimulus ports 
 }
 
+static void check_battery_full()
+{
+  static bool cleared = false;
+  if (cleared) return;
+
+  int battery_mV = get_battery_voltage_mV();
+  if (battery_mV > 41000 || (battery_mV > 40000 && g_system_state.total_energy_mJ > 100000000))
+  {
+    // Battery fully charged
+    g_system_state.total_distance_m = 0;
+    g_system_state.total_energy_mJ = 0;
+    g_system_state.total_time_ms = 0;
+    save_system_state();
+    cleared = true;
+  }
+}
+
+static void bootup_animation()
+{
+  // Bootup animation and battery level display
+  int batt_level = battery_percent() * 17 / 100;
+  for (int i = 0; i < 27; i++)
+  {
+    int r = 0, g = 0, b = 0;
+    if (i < 10)
+    {
+      r = 64;
+      g = 0;
+      b = 0;
+    }
+    else if (i - 10 < batt_level)
+    {
+      if (i - 10 < 10)
+      {
+        r = 64;
+        g = 32;
+        b = 0;
+      }
+      else
+      {
+        r = 0;
+        g = 64;
+        b = 0;
+      }
+    }
+    ws2812_write_led(26 - i, r, g, b);
+    ws2812_write_led(27 + i, r, g, b);
+    chThdSleepMilliseconds(25);
+  }
+}
+
 bool g_have_motor;
 bool g_is_powerout;
 
@@ -76,36 +127,6 @@ int main(void)
     sensors_start();
     ui_start();
 
-    // Bootup animation and battery level display
-    int batt_level = battery_percent() * 17 / 100;
-    for (int i = 0; i < 27; i++)
-    {
-      int r = 0, g = 0, b = 0;
-      if (i < 10)
-      {
-        r = 64;
-        g = 0;
-        b = 0;
-      }
-      else if (i - 10 < batt_level)
-      {
-        if (i - 10 < 10)
-        {
-          r = 64;
-          g = 32;
-          b = 0;
-        }
-        else
-        {
-          r = 0;
-          g = 64;
-          b = 0;
-        }
-      }
-      ws2812_write_led(26 - i, r, g, b);
-      ws2812_write_led(27 + i, r, g, b);
-      chThdSleepMilliseconds(25);
-    }
     
     g_have_motor = (motor_orientation_get_hall_sector() >= 0);
     
@@ -132,6 +153,10 @@ int main(void)
       motor_sampling_init(); // For battery voltage
     }
     
+    chThdSleepMilliseconds(50);
+    check_battery_full();
+    bootup_animation();
+
     enable_trace();
     
     while (true)
@@ -145,5 +170,10 @@ int main(void)
         chThdSleepMilliseconds(5);
         
         check_usb_usart();
+
+        if (chVTGetSystemTime() < 5000)
+        {
+          check_battery_full();
+        }
     }
 }
