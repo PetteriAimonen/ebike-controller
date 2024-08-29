@@ -151,6 +151,8 @@ int main(void)
     else
     {
       motor_sampling_init(); // For battery voltage
+      motor_sampling_update();
+      motor_sampling_update();
     }
     
     chThdSleepMilliseconds(50);
