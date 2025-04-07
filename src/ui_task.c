@@ -37,6 +37,14 @@ int ui_get_ok_button_clicks()
   return oldcount;
 }
 
+// Buttons are connected in series to the ADC input, and each button
+// has a resistor in parallel with it. The PCB has a 2.2 kohm pulldown
+// resistor. The ADC reading is 4096 * 2.2k / (R + 2.2k)
+//
+// Button '-' has 220 ohm in parallel
+// Button '+' has 470 ohm in parallel
+// Button 'K' has 820 ohm in parallel
+//
 static char ui_get_button()
 {
   RCC->APB2ENR |= RCC_APB2ENR_ADC3EN;
@@ -95,7 +103,7 @@ static void config_entry(int i, int selected, bool editing, const char *name, vo
   }
 
   u8g_SetFont(&u8g, u8g_font_8x13);
-  u8g_DrawStr(&u8g, 0, 32 + i * 14, buf);
+  u8g_DrawStr(&u8g, 0, 32 + i * 16, buf);
 }
 
 static bool config_page(char button)
@@ -216,26 +224,26 @@ static void powerout_page(char button)
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d %2d.%01d V",
               secs / 3600, (secs % 3600) / 60, secs % 60, V_x10 / 10, V_x10 % 10);
-    u8g_DrawStr(&u8g, 0, 14, buf);
+    u8g_DrawStr(&u8g, 0, 16, buf);
     
     // Output voltage and current
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf),
               (control == 0) ? "[ %2d V ]  %2d A" : "%2d V  [ %2d A ]",
                voltage, current);
-    u8g_DrawStr(&u8g, 0, 28, buf);
+    u8g_DrawStr(&u8g, 0, 30, buf);
 
     // Output voltage and current
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "%s %2d.%02d A",
                (current_x100 >= 0) ? "Out:" : "In: ", abscur / 100, abscur % 100);
-    u8g_DrawStr(&u8g, 0, 42, buf);
+    u8g_DrawStr(&u8g, 0, 44, buf);
 
     // Total energy used
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "Tot: %3d.%01d Wh",
                Wh_x10 / 10, Wh_x10 % 10);
-    u8g_DrawStr(&u8g, 0, 56, buf);
+    u8g_DrawStr(&u8g, 0, 58, buf);
   } while (u8g_NextPage(&u8g));
 
   set_dcdc_mode(voltage * 1000, current * 1000);
@@ -268,30 +276,30 @@ static void status_page(char button)
       u8g_SetFont(&u8g, u8g_font_courB18);
       chsnprintf(buf, sizeof(buf), "%02d:%02d:%02d",
                 secs / 3600, (secs % 3600) / 60, secs % 60);
-      u8g_DrawStr(&u8g, 5, 18, buf);
+      u8g_DrawStr(&u8g, 5, 16, buf);
     }
     else
     {
       u8g_SetFont(&u8g, u8g_font_courB18);
-      u8g_DrawStr(&u8g, 5, 18, "NO MOTOR");
+      u8g_DrawStr(&u8g, 5, 16, "NO MOTOR");
     }
     
     // Total energy used, assist level
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "%3d.%01d Wh   %2d%%",
                Wh_x10 / 10, Wh_x10 % 10, g_assist_level);
-    u8g_DrawStr(&u8g, 0, 35, buf);
+    u8g_DrawStr(&u8g, 0, 33, buf);
     
     // Total distance, bat volts
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "%3d.%01d km %2d.%01d V",
                km_x10 / 10, km_x10 % 10, V_x10 / 10, V_x10 % 10);
-    u8g_DrawStr(&u8g, 0, 50, buf);
+    u8g_DrawStr(&u8g, 0, 48, buf);
 
     // Total distance ever
     u8g_SetFont(&u8g, u8g_font_8x13);
     chsnprintf(buf, sizeof(buf), "Total: %5d km", g_system_state.alltime_distance_m / 1000);
-    u8g_DrawStr(&u8g, 5, 64, buf);
+    u8g_DrawStr(&u8g, 5, 62, buf);
   } while (u8g_NextPage(&u8g));
 }
 
@@ -304,9 +312,9 @@ static void ui_thread(void *p)
   u8g_FirstPage(&u8g);
   do {
     u8g_SetFont(&u8g, u8g_font_8x13);
-    u8g_DrawStr(&u8g, 0, 20, "Owner:");
-    u8g_DrawStr(&u8g, 0, 40, "Petteri Aimonen");
-    u8g_DrawStr(&u8g, 0, 60, "jpa@kapsi.fi");
+    u8g_DrawStr(&u8g, 0, 16, "Owner:");
+    u8g_DrawStr(&u8g, 0, 38, "Petteri Aimonen");
+    u8g_DrawStr(&u8g, 0, 58, "jpa@kapsi.fi");
   } while (u8g_NextPage(&u8g));
   
   for (int i = 0; i < 500; i++)
