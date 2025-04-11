@@ -22,6 +22,7 @@ uint8_t u8g_com_i2c_chibios_fn(u8g_t *u8g, uint8_t msg, uint8_t arg_val, void *a
 extern bool g_have_motor;
 extern bool g_is_powerout;
 static int g_assist_level = 50;
+static bool in_accel_bias_menu;
 
 int ui_get_assist_level()
 {
@@ -35,6 +36,11 @@ int ui_get_ok_button_clicks()
   int oldcount = g_ok_button_count;
   g_ok_button_count = 0;
   return oldcount;
+}
+
+bool ui_task_settings_menu_accel_bias_is_open()
+{
+    return in_accel_bias_menu;
 }
 
 // Buttons are connected in series to the ADC input, and each button
@@ -164,6 +170,8 @@ static bool config_page(char button)
     config_entry(21, selected, editing, "Brake", &brake, delta);
     delta = 0;
   } while (u8g_NextPage(&u8g));
+
+  in_accel_bias_menu = (selected == 1 && editing);
 
   if (selected == 0 && editing)
   {

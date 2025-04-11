@@ -384,6 +384,30 @@ static void state_powered()
   prev_current = g_motor_current;
 }
 
+static void update_accel_leds(int accel_mg, int firstled)
+{
+    int center = 9;
+    int led_pos = center + accel_mg / 5;
+    if (led_pos < 0) led_pos = 0;
+    if (led_pos > 17) led_pos = 17;
+
+    for (int i = 0; i < 18; i++)
+    {
+        if (i == led_pos)
+        {
+            ws2812_write_led(i + firstled, 255, 255, 0); // Orange: current accelerometer value
+        }
+        else if (i == center)
+        {
+            ws2812_write_led(i + firstled, 0, 128, 0); // Green: center position
+        }
+        else
+        {
+            ws2812_write_led(i + firstled, 0, 0, 0);
+        }
+    }
+}
+
 void bike_control_update_leds()
 {
   static bool was_brake;
@@ -391,6 +415,20 @@ void bike_control_update_leds()
   if (chVTGetSystemTime() < 8000)
   {
     // Let startup battery level indicator stay for a while
+    return;
+  }
+
+  if (ui_task_settings_menu_accel_bias_is_open())
+  {
+    // Show accelerometer orientation on LEDs
+    int x, y, z;
+    sensors_get_accel(&x, &y, &z);
+    z -= g_system_state.accelerometer_bias_mg;
+    if (g_system_state.accelerometer_invert) z = -z;
+
+    update_accel_leds(z, 0);
+    update_accel_leds(-x, 18);
+    update_accel_leds(-z, 36);
     return;
   }
 
