@@ -39,7 +39,13 @@ static void flash_write(uint32_t *flash, uint32_t *data, int len)
     FLASH->KEYR = 0xCDEF89AB;
     FLASH->CR = FLASH_CR_PSIZE_1 | FLASH_CR_PG;
     
-    flash[i] = data[i];
+    uint32_t *dest = &flash[i];
+    if (dest < (uint32_t*)&__settings_start__ ||
+        dest >= (uint32_t*)&__settings_end__)
+    {
+      abort_with_error("FLASHW %08x", (unsigned)dest);
+    }
+    *dest = data[i];
     while (FLASH->SR & FLASH_SR_BSY);
 
     FLASH->CR |= FLASH_CR_LOCK;
