@@ -140,6 +140,22 @@ void bootloader_restore_backup()
   bootloader_print("Backup firmware restored\r\n");
 }
 
+void bootloader_set_optbits(uint32_t newval)
+{
+  uint32_t oldval = FLASH->OPTCR & ~3;
+  newval &= ~3;
+  if (oldval != newval)
+  {
+    FLASH->OPTKEYR = 0x08192A3B;
+    FLASH->OPTKEYR = 0x4C5D6E7F;
+    FLASH->OPTCR = newval;
+    FLASH->OPTCR = newval | FLASH_OPTCR_OPTSTRT;
+    while (FLASH->SR & FLASH_SR_BSY);
+
+    FLASH->OPTCR |= FLASH_OPTCR_OPTLOCK;
+  }
+}
+
 void bootloader_load_firmware()
 {
   uint8_t *tmp = (uint8_t*)0x20000000;
@@ -189,11 +205,13 @@ void bootloader_main()
 
   char button = bootloader_get_button();
   char button2 = bootloader_get_button();
+  char button3 = bootloader_get_button();
 
-  while (button != button2)
+  while (button != button2 || button != button3)
   {
      button = bootloader_get_button();
      button2 = bootloader_get_button();
+     button3 = bootloader_get_button();
   }
   
   if (button == '+')
@@ -220,6 +238,8 @@ void bootloader_main()
                   "r" (reset_vector) : "memory");
   }
   
+  bootloader_set_optbits(0x0FFFAAE0); // Set BOR level 3
+
   /* Now continue to the main application */
   SCB->VTOR = (uint32_t)__mainprogram_start__;
   
