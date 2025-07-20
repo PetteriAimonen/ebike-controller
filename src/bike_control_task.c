@@ -535,6 +535,8 @@ static void bike_control_thread(void *p)
   
   chRegSetThreadName("bike_ctrl");
   
+  chThdSleepMilliseconds(200); // To update battery level
+
   if (battery_percent() < BATTERY_LEVEL_WARN)
   {
     /* Sad sound for low battery */

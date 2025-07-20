@@ -172,6 +172,7 @@ void motor_sampling_update_raw(int battery_mA, int vbat_adc, int ntc_adc, float 
   if (esr_drop_mV > 2000) esr_drop_mV = 2000;
   if (esr_drop_mV < -1000) esr_drop_mV = -1000;
   mV += esr_drop_mV;
+  mV += g_system_state.battery_volt_trim_mV;
   if (g_battery_voltage < BATTERY_MIN_VOLTAGE_B) g_battery_voltage = mV;
   g_battery_voltage = g_battery_voltage * (1 - decay) + mV * decay;
 

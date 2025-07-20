@@ -142,6 +142,7 @@ int main(void)
     {
       start_motor_control();
       start_log();
+      chThdSleepMilliseconds(200); // For battery voltage to update
       start_bike_control();
     }
     else if (g_is_powerout)
@@ -151,14 +152,13 @@ int main(void)
     else
     {
       motor_sampling_init(); // For battery voltage
-      for (int i = 0; i < 10; i++)
+      for (int i = 0; i < 200; i++)
       {
-        chThdSleepMilliseconds(10);
+        chThdSleepMilliseconds(1);
         motor_sampling_update();
       }
     }
     
-    chThdSleepMilliseconds(50);
     check_battery_full();
     bootup_animation();
 

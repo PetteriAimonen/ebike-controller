@@ -73,7 +73,6 @@ void log_writer_thread(void *p)
   int writeptr = 0;
   
   chRegSetThreadName("logwriter");
-  chThdSleepMilliseconds(2000);
   
   int prev_distance = 0;
   systime_t prev_time = 0;

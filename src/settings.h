@@ -35,6 +35,7 @@ typedef struct
   int battery_esr_mohm;
   int max_regen_A;
   int battery_capacity_Wh;
+  int battery_volt_trim_mV;
 } system_state_t;
 
 // Constant size struct with padding for flash storage
