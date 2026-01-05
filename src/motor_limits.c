@@ -35,7 +35,7 @@ void motor_limits_update()
   
   apply_limit(&fraction, g_system_state.max_krpm * 1000, g_system_state.max_krpm * 1200, motor_orientation_get_rpm());
 
-  if (wheel_speed_get_velocity() < ACCEL_LIMIT_SPEED_M_S)
+  if (wheel_speed_get_velocity() < ACCEL_LIMIT_SPEED_M_S && g_system_state.accel_time > 0)
   {
     // Limit acceleration when wheel is not yet spinning fast
     int max_accel = g_system_state.max_krpm * 1000 / g_system_state.accel_time;
